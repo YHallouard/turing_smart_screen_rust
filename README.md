@@ -60,10 +60,28 @@ cargo run -p bc250-dashboard --features serial -- --backend serial --port /dev/c
 macOS needs nothing extra. On Linux the `serial` feature links `libudev`, so
 install `pkg-config` + `libudev-dev` (`libudev-devel` on Fedora/Bazzite) first.
 
+## Orientation
+
+The panel has no orientation sensor, so it is a static choice in `config.toml`
+(read once at startup — change it, then restart):
+
+```toml
+[panel]
+orientation = "portrait"   # 320x480   |   "landscape" -> 480x320
+```
+
+`--orientation portrait|landscape` overrides it for a run (handy for previewing).
+
+Scenes are authored **per orientation**, not rotated: for `--scene .../boot.toml`
+the daemon loads `boot.<orientation>.toml` next to it if present, else `boot.toml`.
+The logical canvas passed to the engine is 320x480 or 480x320 accordingly; only
+the serial backend maps a landscape frame onto the physical 320x480 array.
+
 ## Scene format
 
-Scenes are TOML (`assets/scenes/*.toml`): a `[scene]` block plus `[[layer]]`s of
-type `text`, `rect`, `image` or `progress_bar`, each with optional
-`[[layer.anim]]` keyframes on `opacity` / `x` / `y` / `scale` / `value`. Text and
-numeric fields interpolate `{{ context.vars }}` supplied by the daemon. See
-`assets/scenes/boot.toml`.
+Scenes are TOML (`assets/scenes/*.toml`): a `[scene]` block (`name`, `duration`,
+`background`, optional `orientation`) plus `[[layer]]`s of type `text`, `rect`,
+`image` or `progress_bar`, each with optional `[[layer.anim]]` keyframes on
+`opacity` / `x` / `y` / `scale` / `value`. Text and numeric fields interpolate
+`{{ context.vars }}` supplied by the daemon. See `assets/scenes/boot.portrait.toml`
+and `assets/scenes/boot.landscape.toml`.

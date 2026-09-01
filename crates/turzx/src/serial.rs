@@ -4,18 +4,21 @@
 //! enumerates as a plain serial device, so you can drive it straight from a Mac
 //! for animation work without Steam or a BC-250 in the loop.
 
+use std::borrow::Cow;
 use std::io::Write;
 use std::time::Duration;
 
 use crate::protocol::Command;
 use crate::{
-    BackendError, DisplayBackend, Frame, Rect, Result, PANEL_HEIGHT, PANEL_WIDTH, TURZX_PID,
-    TURZX_VID,
+    BackendError, DisplayBackend, Frame, Orientation, Rect, Result, PANEL_HEIGHT, PANEL_WIDTH,
+    TURZX_PID, TURZX_VID,
 };
 
 pub struct SerialTurzx {
     port: Box<dyn serialport::SerialPort>,
+    /// Physical pixel array, always 320x480 on the wire.
     size: (u16, u16),
+    orientation: Orientation,
     warned: bool,
 }
 
@@ -50,10 +53,18 @@ impl SerialTurzx {
         let mut this = Self {
             port,
             size: (PANEL_WIDTH, PANEL_HEIGHT),
+            orientation: Orientation::Portrait,
             warned: false,
         };
         this.send(Command::Hello, &[])?;
         Ok(this)
+    }
+
+    /// Set the mounting orientation. In `Landscape` the backend rotates each
+    /// 480x320 logical frame onto the physical 320x480 array before sending.
+    pub fn with_orientation(mut self, orientation: Orientation) -> Self {
+        self.orientation = orientation;
+        self
     }
 
     fn send(&mut self, cmd: Command, data: &[u8]) -> Result<()> {
@@ -80,11 +91,17 @@ impl DisplayBackend for SerialTurzx {
         }
 
         let (w, h) = self.size;
-        let full = [Rect::new(0, 0, w, h)];
-        let regions = if dirty.is_empty() { &full[..] } else { dirty };
-        let rgb565 = frame.to_rgb565();
 
-        for r in regions {
+        // In landscape the dirty rects are in logical (480x320) space and no
+        // longer apply once rotated, so fall back to a full-frame send.
+        let (frame, regions): (Cow<Frame>, Vec<Rect>) = match self.orientation {
+            Orientation::Portrait if !dirty.is_empty() => (Cow::Borrowed(frame), dirty.to_vec()),
+            Orientation::Portrait => (Cow::Borrowed(frame), vec![Rect::new(0, 0, w, h)]),
+            Orientation::Landscape => (Cow::Owned(frame.rotated_cw()), vec![Rect::new(0, 0, w, h)]),
+        };
+
+        let rgb565 = frame.to_rgb565();
+        for r in &regions {
             let mut buf = Vec::with_capacity(r.area() as usize * 2);
             for row in r.y..r.y + r.h {
                 for col in r.x..r.x + r.w {

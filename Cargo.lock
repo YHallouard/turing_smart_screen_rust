@@ -89,6 +89,8 @@ dependencies = [
  "log",
  "preview",
  "renderer",
+ "serde",
+ "toml",
  "turzx",
 ]
 
@@ -1142,6 +1144,7 @@ name = "turzx"
 version = "0.1.0"
 dependencies = [
  "log",
+ "serde",
  "serialport",
  "thiserror 1.0.69",
 ]

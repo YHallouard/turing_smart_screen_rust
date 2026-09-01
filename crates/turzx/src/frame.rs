@@ -69,6 +69,26 @@ impl Frame {
         &mut self.pixels
     }
 
+    /// Rotate 90° clockwise into a new frame with width/height swapped.
+    ///
+    /// Used by the serial backend to map a landscape-authored frame (480x320)
+    /// onto the physical 320x480 pixel array. The rotation *direction* still
+    /// needs confirming against hardware (see `docs/PROTOCOL.md`).
+    pub fn rotated_cw(&self) -> Frame {
+        let (w, h) = (self.width as usize, self.height as usize);
+        let mut out = Frame::new(self.height, self.width);
+        let dst = out.as_rgba_mut();
+        for y in 0..h {
+            for x in 0..w {
+                let s = (y * w + x) * 4;
+                // (x, y) in a w-wide buffer -> (h-1-y, x) in an h-wide buffer
+                let d = (x * h + (h - 1 - y)) * 4;
+                dst[d..d + 4].copy_from_slice(&self.pixels[s..s + 4]);
+            }
+        }
+        out
+    }
+
     /// Pack into RGB565, one `u16` per pixel, in reading order.
     pub fn to_rgb565(&self) -> Vec<u16> {
         self.pixels
@@ -80,5 +100,21 @@ impl Frame {
                 (r << 11) | (g << 5) | b
             })
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rotated_cw_swaps_dims_and_moves_corner() {
+        let mut f = Frame::new(2, 3); // 2 wide, 3 tall
+        f.as_rgba_mut()[0..4].copy_from_slice(&[9, 9, 9, 9]); // top-left (0,0)
+        let r = f.rotated_cw();
+        assert_eq!((r.width(), r.height()), (3, 2));
+        // top-left of a w-wide buffer lands at top-right of the rotated one
+        let top_right = ((r.width() as usize - 1) * 4)..((r.width() as usize) * 4);
+        assert_eq!(&r.as_rgba()[top_right], &[9, 9, 9, 9]);
     }
 }

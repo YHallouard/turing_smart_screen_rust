@@ -1,0 +1,7 @@
+# Static daemon configuration. No orientation sensor exists on the panel, so
+# changing this means editing the file and restarting the daemon.
+
+[panel]
+# "portrait"  -> 320x480 logical canvas, sent to the panel 1:1
+# "landscape" -> 480x320 logical canvas, mapped onto the physical array
+orientation = "portrait"

@@ -23,6 +23,9 @@ first `present`.
    - coordinate packing (skeleton assumes 4×10-bit big-endian in 5 bytes)
    - pixel order and endianness of RGB565 (skeleton assumes big-endian)
    - whether partial-rectangle updates are supported (needed for dirty rendering)
+   - whether a panel-side **orientation / rotation** opcode exists. If so, prefer
+     it over `Frame::rotated_cw()` in `serial.rs` (and confirm the CW vs CCW
+     direction — the software rotation currently assumes 90° CW).
 4. Update `protocol.rs`, remove the warning in `serial.rs`, and record the
    confirmed values here.
 

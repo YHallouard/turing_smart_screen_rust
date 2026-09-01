@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 140" width="700" height="140"
+     role="img" aria-label="HORUS I">
+  <title>Horus I — wordmark</title>
+  <defs>
+    <linearGradient id="hw-gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="20%" stop-color="#eece86"/>
+      <stop offset="75%" stop-color="#c9a24b"/>
+      <stop offset="100%" stop-color="#8a6f37"/>
+    </linearGradient>
+    <style>
+      @font-face{
+        font-family:'Cinzel';font-style:normal;font-weight:600;font-display:swap;
+        src:url(https://fonts.gstatic.com/s/cinzel/v26/8vIJ7ww63mVu7gt79mT7PkRXMw.woff2) format('woff2');
+      }
+    </style>
+  </defs>
+  <text x="350" y="99" text-anchor="middle"
+        font-family="Cinzel, 'Trajan Pro', 'Times New Roman', serif"
+        font-weight="600" font-size="82" letter-spacing="18"
+        fill="url(#hw-gold)">HORUS I</text>
+</svg>

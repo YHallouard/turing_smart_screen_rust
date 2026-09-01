@@ -42,6 +42,10 @@ pub struct SceneMeta {
     pub duration: f32,
     #[serde(default = "default_background")]
     pub background: String,
+    /// Optional `"portrait"` / `"landscape"` self-declaration. Purely a sanity
+    /// hint: the daemon warns if it disagrees with the runtime orientation.
+    #[serde(default)]
+    pub orientation: Option<String>,
 }
 
 fn default_background() -> String {

@@ -14,5 +14,6 @@ serial = ["dep:serialport", "dep:log"]
 
 [dependencies]
 thiserror = { workspace = true }
+serde = { workspace = true }
 serialport = { version = "4", optional = true }
 log = { workspace = true, optional = true }

@@ -1,0 +1,82 @@
+# Boot animation (spec §14) — portrait, 320x480.
+# Generic: no game, no hardcoded strings beyond the BC-250 check-list, which the
+# daemon feeds in via `{{ status }}`.
+
+[scene]
+name = "boot"
+duration = 6.0
+background = "#04070d"
+orientation = "portrait"
+
+# Title: fades in while sliding down slightly.
+[[layer]]
+type = "text"
+value = "BC-250"
+x = 70
+y = 70
+scale = 4
+color = "#00ff9c"
+[[layer.anim]]
+property = "opacity"
+from = 0.0
+to = 1.0
+start = 0.0
+end = 1.2
+easing = "ease_out"
+[[layer.anim]]
+property = "y"
+from = 40.0
+to = 70.0
+start = 0.0
+end = 1.2
+easing = "ease_out"
+
+# Subtitle.
+[[layer]]
+type = "text"
+value = "TURZX DASHBOARD"
+x = 40
+y = 130
+scale = 2
+color = "#3f6f5f"
+[[layer.anim]]
+property = "opacity"
+from = 0.0
+to = 1.0
+start = 0.6
+end = 1.6
+easing = "linear"
+
+# Divider.
+[[layer]]
+type = "rect"
+x = 40
+y = 300
+width = 240
+height = 2
+color = "#12362b"
+
+# Status line driven by the daemon's boot check-list.
+[[layer]]
+type = "text"
+value = "{{ status }}"
+x = 40
+y = 320
+scale = 2
+color = "#e8f0ff"
+
+# Progress bar, 0 -> 1 across most of the scene.
+[[layer]]
+type = "progress_bar"
+x = 40
+y = 360
+width = 240
+height = 14
+color = "#00ff9c"
+[[layer.anim]]
+property = "value"
+from = 0.0
+to = 1.0
+start = 0.4
+end = 5.6
+easing = "linear"
