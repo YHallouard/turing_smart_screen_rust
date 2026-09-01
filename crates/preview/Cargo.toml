@@ -1,0 +1,18 @@
+[package]
+name = "preview"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Non-hardware DisplayBackends: a desktop preview window and a PNG frame dump"
+
+[features]
+default = []
+# Desktop preview window (macOS / Linux / Windows). Off by default so the
+# workspace builds on a headless box.
+window = ["dep:minifb"]
+
+[dependencies]
+turzx = { path = "../turzx" }
+image = { workspace = true }
+minifb = { version = "0.27", optional = true }

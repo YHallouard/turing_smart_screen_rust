@@ -1,0 +1,18 @@
+[package]
+name = "renderer"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Data-driven scene / widget / animation engine that produces frames for a DisplayBackend"
+
+[dependencies]
+turzx = { path = "../turzx" }
+serde = { workspace = true }
+toml = { workspace = true }
+anyhow = { workspace = true }
+image = { workspace = true }
+log = { workspace = true }
+
+[dev-dependencies]
+turzx = { path = "../turzx" }

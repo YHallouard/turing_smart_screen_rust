@@ -1,0 +1,18 @@
+[package]
+name = "turzx"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Frame type, display-backend trait and (optional) USB driver for the TURZX 3.5\" panel"
+
+[features]
+default = []
+# Real USB CDC-ACM panel driver. Off by default so the workspace builds without
+# libudev / a serial stack (e.g. in CI or on a headless box).
+serial = ["dep:serialport", "dep:log"]
+
+[dependencies]
+thiserror = { workspace = true }
+serialport = { version = "4", optional = true }
+log = { workspace = true, optional = true }
