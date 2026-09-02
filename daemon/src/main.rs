@@ -51,6 +51,11 @@ struct Cli {
     #[arg(long = "loop")]
     loop_scene: bool,
 
+    /// Deterministic capture: step scene time by exactly `1/fps` each frame
+    /// (ignore the wall clock) and render `duration * fps` frames, then exit.
+    #[arg(long)]
+    capture: bool,
+
     /// Serial device path for the `serial` backend; auto-detected if omitted.
     #[arg(long)]
     port: Option<String>,
@@ -175,17 +180,23 @@ fn main() -> Result<()> {
         cli.backend
     );
 
+    let mut frame_idx: u32 = 0;
     loop {
         let frame_start = Instant::now();
-        let elapsed = start.elapsed().as_secs_f32();
-        if !cli.loop_scene && elapsed > duration {
+        let scene_t = if cli.capture {
+            frame_idx as f32 / cli.fps.max(1) as f32
+        } else {
+            let elapsed = start.elapsed().as_secs_f32();
+            if cli.loop_scene {
+                elapsed % duration
+            } else {
+                elapsed
+            }
+        };
+        frame_idx += 1;
+        if !cli.loop_scene && scene_t > duration {
             break;
         }
-        let scene_t = if cli.loop_scene {
-            elapsed % duration
-        } else {
-            elapsed
-        };
         let progress = (scene_t / duration).clamp(0.0, 1.0);
 
         let mut ctx = Context::new();
@@ -198,8 +209,10 @@ fn main() -> Result<()> {
             break;
         }
 
-        if let Some(rem) = frame_budget.checked_sub(frame_start.elapsed()) {
-            std::thread::sleep(rem);
+        if !cli.capture {
+            if let Some(rem) = frame_budget.checked_sub(frame_start.elapsed()) {
+                std::thread::sleep(rem);
+            }
         }
     }
 

@@ -14,12 +14,16 @@ Phase 1–2 of the plan:
 
 | Crate | What it does | State |
 |-------|--------------|-------|
-| `crates/turzx` | `Frame`, `DisplayBackend` trait, dirty-region tracking, USB serial driver (`serial` feature) | trait + preview solid; **serial protocol is an unverified skeleton** |
-| `crates/renderer` | TOML scene / widget / keyframe-animation engine, CPU framebuffer, 5×7 bitmap font | working |
+| `crates/turzx` | `Frame`, `DisplayBackend` trait, `Orientation`, dirty-region tracking, USB serial driver (`serial` feature) | trait + preview solid; **serial protocol is an unverified skeleton** |
+| `crates/renderer` | TOML scene engine on `tiny_skia` (AA paths, gradients, transforms, additive blend, glow) + `fontdue` TTF text; multi-keyframe animation | working |
 | `crates/preview` | non-hardware backends: PNG dump + desktop window (`window` feature) | working |
-| `daemon` (`bc250-dashboard`) | loads a scene, plays it through a backend | working |
+| `daemon` (`bc250-dashboard`) | loads the orientation-specific scene, plays it through a backend | working |
 
-Not yet started: Steam detection, sensors, the event engine, the scene library.
+The reference **"Boot Horus I"** animation (10 s, both orientations — power sweep,
+eye traced then ignited in gold, wordmark, seal→badge handoff, GPU/CPU/VRAM/FPS
+dashboard) is implemented in `assets/scenes/boot.{portrait,landscape}.toml`.
+
+Not yet started: Steam detection, sensors, the event engine, a wider scene library.
 
 ## Build & test
 
@@ -28,9 +32,12 @@ make check      # fmt + clippy + build + test
 cargo test --workspace
 ```
 
-The default workspace build has **no system dependencies** (PNG backend only).
-`--features window` pulls in `minifb`; `--features serial` pulls in `serialport`
-(needs `libudev` on Linux).
+The default workspace build has **no system dependencies** (PNG backend only;
+`tiny-skia` and `fontdue` are pure Rust). `--features window` pulls in `minifb`;
+`--features serial` pulls in `serialport` (needs `libudev` on Linux).
+
+Fonts (Cinzel, Rajdhani, JetBrains Mono — all SIL OFL) are vendored under
+`assets/fonts/` and embedded in the binary; see `assets/fonts/OFL-*.txt`.
 
 ## Run
 
@@ -38,6 +45,8 @@ Render the boot scene to `target/frames/*.png`:
 
 ```sh
 cargo run -p bc250-dashboard -- --backend png
+# deterministic filmstrip (step scene time by 1/fps, ignore the wall clock):
+cargo run -p bc250-dashboard -- --backend png --capture --fps 30 --out target/frames
 ```
 
 Live preview window — the way to iterate on animations on a Mac/desktop, no
@@ -79,9 +88,23 @@ the serial backend maps a landscape frame onto the physical 320x480 array.
 
 ## Scene format
 
-Scenes are TOML (`assets/scenes/*.toml`): a `[scene]` block (`name`, `duration`,
-`background`, optional `orientation`) plus `[[layer]]`s of type `text`, `rect`,
-`image` or `progress_bar`, each with optional `[[layer.anim]]` keyframes on
-`opacity` / `x` / `y` / `scale` / `value`. Text and numeric fields interpolate
-`{{ context.vars }}` supplied by the daemon. See `assets/scenes/boot.portrait.toml`
-and `assets/scenes/boot.landscape.toml`.
+Scenes are TOML (`assets/scenes/*.toml`):
+
+- `[scene]` — `name`, `duration`, `background` (`"#rrggbb[aa]"` or
+  `"gradient:<name>"`), optional `orientation`.
+- `[[gradient]]` — `name`, `kind` (`linear`/`radial`), `axis`
+  (`vertical`/`horizontal`), `stops = [{ at, color }]`.
+- `[[layer]]` — `type` is `text` (bitmap 5×7 or, with `font =
+  "cinzel"|"rajdhani"|"mono"`, TTF at `size`, `letter_spacing`, `align`),
+  `rect`, `image`, `progress_bar`, `path` (`d = "@horus_eye"` or inline / an
+  `.svg`), `circle` (`radius`), or `scanlines`. Common fields: `x/y/width/height`,
+  `scale`, `rotation`, `anchor` (`top_left`/`center`), `fill`/`stroke`
+  (paint spec), `stroke_width`, `blend` (`normal`/`add`), `glow` + `glow_radius`,
+  `trace` (0..1 outline / letter reveal).
+- `[[layer.anim]]` — `property` (`opacity`/`x`/`y`/`width`/`height`/`scale`/
+  `rotation`/`trace`/`value`), `easing`, and either `keys = [{ t, v }, …]` or the
+  shorthand `from`/`to`/`start`/`end`.
+
+Text and numeric fields interpolate `{{ context.vars }}` from the daemon. Full
+worked example: `assets/scenes/boot.portrait.toml` /
+`assets/scenes/boot.landscape.toml`.

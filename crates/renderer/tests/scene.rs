@@ -40,6 +40,39 @@ fn engine_renders_full_frame_then_dirty_subset() {
     );
 }
 
+const HORUS_PORTRAIT: &str = include_str!("../../../assets/scenes/boot.portrait.toml");
+const HORUS_LANDSCAPE: &str = include_str!("../../../assets/scenes/boot.landscape.toml");
+
+#[test]
+fn horus_scenes_render_across_the_timeline() {
+    for (src, w, h) in [
+        (HORUS_PORTRAIT, 320u16, 480u16),
+        (HORUS_LANDSCAPE, 480, 320),
+    ] {
+        let scene = SceneFile::from_toml_str(src).expect("horus scene parses");
+        assert_eq!(scene.gradients.len(), 4);
+        let mut engine = SceneEngine::new(w, h);
+        engine
+            .load_assets(&scene, Path::new("assets/scenes"))
+            .expect("assets load (eye path parses)");
+        let ctx = Context::new();
+        // Covers Power, Trace, Ignite, Wordmark, Handoff and the outro — this
+        // also guards against the tiny-skia hairline panic on thin rects.
+        for &t in &[0.2f32, 0.6, 2.0, 3.5, 4.9, 5.5, 7.0, 8.5, 9.2, 9.95] {
+            let (frame, _dirty) = engine.render(&scene, &ctx, t);
+            assert_eq!((frame.width(), frame.height()), (w, h));
+        }
+        // Mid-ignite the frame should be strongly lit (gold flash + fill).
+        let (frame, _) = engine.render(&scene, &ctx, 5.0);
+        let bright = frame
+            .as_rgba()
+            .chunks_exact(4)
+            .filter(|p| p[0] > 180)
+            .count();
+        assert!(bright > 500, "ignite frame should be lit, got {bright}");
+    }
+}
+
 #[test]
 fn non_black_pixels_are_drawn() {
     let scene = SceneFile::from_toml_str(BOOT_TOML).unwrap();

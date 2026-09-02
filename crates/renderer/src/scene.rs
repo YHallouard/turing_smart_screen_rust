@@ -2,23 +2,31 @@
 //!
 //! ```toml
 //! [scene]
-//! name = "game_start"
-//! duration = 4.0
-//! background = "#04070d"
+//! name = "boot"
+//! duration = 10.0
+//! background = "gradient:bg"
+//!
+//! [[gradient]]
+//! name = "gold"
+//! kind = "linear"
+//! stops = [ { at = 0.2, color = "#eece86" }, { at = 1.0, color = "#8a6f37" } ]
 //!
 //! [[layer]]
-//! type = "text"
-//! value = "{{ game.name }}"
-//! x = 20
-//! y = 40
-//! color = "#ffffff"
-//! scale = 3
+//! type = "path"
+//! d = "@horus_eye"
+//! x = 160
+//! y = 204
+//! scale = 0.278
+//! fill = "gradient:gold"
+//! stroke = "#eece86"
+//! stroke_width = 3.2
+//! anchor = "center"
 //! [[layer.anim]]
-//! property = "opacity"
+//! property = "trace"
 //! from = 0.0
 //! to = 1.0
-//! end = 1.0
-//! easing = "ease_out"
+//! start = 1.4
+//! end = 4.8
 //! ```
 
 use std::path::Path;
@@ -27,10 +35,13 @@ use anyhow::Context as _;
 use serde::Deserialize;
 
 use crate::anim::Anim;
+use crate::paint::Gradient;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SceneFile {
     pub scene: SceneMeta,
+    #[serde(default, rename = "gradient")]
+    pub gradients: Vec<Gradient>,
     #[serde(default, rename = "layer")]
     pub layers: Vec<Layer>,
 }
@@ -40,6 +51,7 @@ pub struct SceneMeta {
     pub name: String,
     /// Seconds. The daemon stops (or loops) the scene after this.
     pub duration: f32,
+    /// `"#rrggbb[aa]"` or `"gradient:<name>"`.
     #[serde(default = "default_background")]
     pub background: String,
     /// Optional `"portrait"` / `"landscape"` self-declaration. Purely a sanity
@@ -59,12 +71,42 @@ pub enum LayerKind {
     Rect,
     Image,
     ProgressBar,
+    Path,
+    Circle,
+    Scanlines,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Anchor {
+    #[default]
+    TopLeft,
+    Center,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Blend {
+    #[default]
+    Normal,
+    /// Additive — for the power / ignite flashes.
+    Add,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Align {
+    #[default]
+    Start,
+    Middle,
+    End,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Layer {
     #[serde(rename = "type")]
     pub kind: LayerKind,
+
     #[serde(default)]
     pub x: f32,
     #[serde(default)]
@@ -73,26 +115,86 @@ pub struct Layer {
     pub width: f32,
     #[serde(default)]
     pub height: f32,
-    /// Text pixel multiplier; defaults to 2 for `text` layers.
+    /// `text`: multiplier for the 5x7 fallback font. `image`/`path`: scale
+    /// factor. Defaults to 2 for bitmap text, 1 otherwise.
     #[serde(default)]
     pub scale: Option<f32>,
-    /// `text`: the string (may contain `{{ vars }}`).
-    /// `progress_bar`: the 0..1 fill (may be a `{{ var }}`) unless animated.
     #[serde(default)]
-    pub value: Option<String>,
-    /// `image`: path relative to the scene file.
+    pub rotation: f32,
     #[serde(default)]
-    pub source: Option<String>,
+    pub trace: Option<f32>,
     #[serde(default)]
-    pub color: Option<String>,
+    pub anchor: Anchor,
+    #[serde(default)]
+    pub blend: Blend,
     #[serde(default = "default_opacity")]
     pub opacity: f32,
+
+    /// `text`: the string. `progress_bar`: the 0..1 fill.
+    #[serde(default)]
+    pub value: Option<String>,
+    /// `image`: path relative to the scene file. `path`: an `.svg` to read `d`
+    /// from.
+    #[serde(default)]
+    pub source: Option<String>,
+    /// `path`: inline path data, or `@horus_eye` for the built-in glyph.
+    #[serde(default)]
+    pub d: Option<String>,
+    /// `circle`: radius.
+    #[serde(default)]
+    pub radius: f32,
+
+    /// Flat `"#rrggbb"` (fallback text, rect). Kept for back-compat.
+    #[serde(default)]
+    pub color: Option<String>,
+    /// Fill paint: `"#rrggbb[aa]"` or `"gradient:<name>"`.
+    #[serde(default)]
+    pub fill: Option<String>,
+    /// Outline paint (`path`, `circle`).
+    #[serde(default)]
+    pub stroke: Option<String>,
+    #[serde(default)]
+    pub stroke_width: Option<f32>,
+    #[serde(default)]
+    pub stroke_opacity: Option<f32>,
+
+    /// TTF text: `"cinzel"`, `"rajdhani"`, `"mono"`.
+    #[serde(default)]
+    pub font: Option<String>,
+    /// TTF text pixel size.
+    #[serde(default)]
+    pub size: Option<f32>,
+    /// Extra spacing between glyphs, in `em` (0.22 in the design).
+    #[serde(default)]
+    pub letter_spacing: f32,
+    #[serde(default)]
+    pub align: Align,
+    /// `0..1` fraction of the letters revealed (whole-run reveal).
+    #[serde(default)]
+    pub letter_reveal: Option<f32>,
+
+    /// Glow (blur halo) strength `0..1`, and its blur radius in px.
+    #[serde(default)]
+    pub glow: f32,
+    #[serde(default = "default_glow_radius")]
+    pub glow_radius: f32,
+
+    /// `scanlines`: row period.
+    #[serde(default = "default_period")]
+    pub period: i32,
+
     #[serde(default, rename = "anim")]
     pub anims: Vec<Anim>,
 }
 
 fn default_opacity() -> f32 {
     1.0
+}
+fn default_glow_radius() -> f32 {
+    4.0
+}
+fn default_period() -> i32 {
+    3
 }
 
 impl SceneFile {

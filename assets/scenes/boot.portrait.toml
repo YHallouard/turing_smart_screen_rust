@@ -1,82 +1,518 @@
-# Boot animation (spec §14) — portrait, 320x480.
-# Generic: no game, no hardcoded strings beyond the BC-250 check-list, which the
-# daemon feeds in via `{{ status }}`.
+# Horus I — boot animation, portrait 320x480, 10 s.
+# Full port of the Claude Design "Boot Horus I" (boot-horus.jsx, LAYOUTS.portrait).
+# Cues (absolute s): Power 0.0 · Trace 1.4 · Ignite 4.8 · Wordmark 6.4 · Handoff 8.2 · end 10.0
 
 [scene]
 name = "boot"
-duration = 6.0
-background = "#04070d"
+duration = 10.0
+background = "gradient:bg"
 orientation = "portrait"
 
-# Title: fades in while sliding down slightly.
-[[layer]]
-type = "text"
-value = "BC-250"
-x = 70
-y = 70
-scale = 4
-color = "#00ff9c"
-[[layer.anim]]
-property = "opacity"
-from = 0.0
-to = 1.0
-start = 0.0
-end = 1.2
-easing = "ease_out"
-[[layer.anim]]
-property = "y"
-from = 40.0
-to = 70.0
-start = 0.0
-end = 1.2
-easing = "ease_out"
+[[gradient]]
+name = "bg"
+kind = "radial"
+radius_scale = 1.25
+stops = [ { at = 0.0, color = "#14141b" }, { at = 1.0, color = "#05060a" } ]
 
-# Subtitle.
-[[layer]]
-type = "text"
-value = "TURZX DASHBOARD"
-x = 40
-y = 130
-scale = 2
-color = "#3f6f5f"
-[[layer.anim]]
-property = "opacity"
-from = 0.0
-to = 1.0
-start = 0.6
-end = 1.6
-easing = "linear"
+[[gradient]]
+name = "gold"
+kind = "linear"
+stops = [ { at = 0.20, color = "#ffd9a0" }, { at = 0.75, color = "#e08a3c" }, { at = 1.00, color = "#8a4f1f" } ]
 
-# Divider.
+[[gradient]]
+name = "sweep"
+kind = "linear"
+stops = [ { at = 0.0, color = "#e08a3c00" }, { at = 0.55, color = "#ffd9a052" }, { at = 1.0, color = "#e08a3c00" } ]
+
+[[gradient]]
+name = "vignette"
+kind = "radial"
+radius_scale = 1.0
+stops = [ { at = 0.55, color = "#00000000" }, { at = 1.0, color = "#000000b3" } ]
+
+# ── POWER: gold sweep top→bottom ────────────────────────────────────────────
 [[layer]]
 type = "rect"
-x = 40
-y = 300
-width = 240
-height = 2
-color = "#12362b"
+x = 0
+y = -100
+width = 320
+height = 100
+fill = "gradient:sweep"
+[[layer.anim]]
+property = "y"
+keys = [ { t = 0.04, v = -100.0 }, { t = 0.92, v = 500.0 } ]
+easing = "ease_in_out_quad"
+[[layer.anim]]
+property = "opacity"
+keys = [ { t = 0.0, v = 1.0 }, { t = 0.7, v = 1.0 }, { t = 1.0, v = 0.0 } ]
+easing = "ease_out_cubic"
 
-# Status line driven by the daemon's boot check-list.
+[[layer]]
+type = "rect"
+x = 0
+y = -45
+width = 320
+height = 1.4
+fill = "#ffd9a0"
+[[layer.anim]]
+property = "y"
+keys = [ { t = 0.04, v = -45.0 }, { t = 0.92, v = 555.0 } ]
+easing = "ease_in_out_quad"
+[[layer.anim]]
+property = "opacity"
+keys = [ { t = 0.0, v = 0.8 }, { t = 0.7, v = 0.8 }, { t = 1.0, v = 0.0 } ]
+easing = "ease_out_cubic"
+
+# ── Console frame ──────────────────────────────────────────────────────────
+[[layer]]
+type = "rect"
+x = 8
+y = 8
+width = 304
+height = 464
+fill = "none"
+stroke = "#8a4f1f"
+stroke_width = 0.8
+stroke_opacity = 0.28
+[[layer.anim]]
+property = "opacity"
+keys = [ { t = 0.0, v = 0.0 }, { t = 0.25, v = 0.0 }, { t = 1.1, v = 1.0 } ]
+easing = "ease_out_cubic"
+
+# ── Seal rings (draw-on, rotate, shrink to badge at Handoff) ───────────────
+[[layer]]
+type = "circle"
+x = 160
+y = 204
+radius = 155
+stroke = "#e08a3c"
+stroke_width = 1.6
+stroke_opacity = 0.55
+[[layer.anim]]
+property = "trace"
+keys = [ { t = 0.12, v = 0.0 }, { t = 0.95, v = 1.0 } ]
+easing = "ease_in_out_quad"
+[[layer.anim]]
+property = "rotation"
+keys = [ { t = 0.0, v = 0.0 }, { t = 10.0, v = 50.0 } ]
+[[layer.anim]]
+property = "y"
+keys = [ { t = 8.1, v = 204.0 }, { t = 8.8, v = 96.0 } ]
+easing = "ease_out_cubic"
+[[layer.anim]]
+property = "scale"
+keys = [ { t = 8.1, v = 1.0 }, { t = 8.8, v = 0.42 } ]
+easing = "ease_out_cubic"
+
+[[layer]]
+type = "circle"
+x = 160
+y = 204
+radius = 148
+stroke = "#e08a3c"
+stroke_width = 0.8
+stroke_opacity = 0.2
+[[layer.anim]]
+property = "trace"
+keys = [ { t = 0.12, v = 0.0 }, { t = 0.95, v = 1.0 } ]
+easing = "ease_in_out_quad"
+[[layer.anim]]
+property = "rotation"
+keys = [ { t = 0.0, v = 0.0 }, { t = 10.0, v = -40.0 } ]
+[[layer.anim]]
+property = "y"
+keys = [ { t = 8.1, v = 204.0 }, { t = 8.8, v = 96.0 } ]
+easing = "ease_out_cubic"
+[[layer.anim]]
+property = "scale"
+keys = [ { t = 8.1, v = 1.0 }, { t = 8.8, v = 0.42 } ]
+easing = "ease_out_cubic"
+
+[[layer]]
+type = "circle"
+x = 160
+y = 204
+radius = 137
+stroke = "#e08a3c"
+stroke_width = 0.8
+stroke_opacity = 0.18
+[[layer.anim]]
+property = "trace"
+keys = [ { t = 0.12, v = 0.0 }, { t = 0.95, v = 1.0 } ]
+easing = "ease_in_out_quad"
+[[layer.anim]]
+property = "rotation"
+keys = [ { t = 0.0, v = 0.0 }, { t = 10.0, v = 60.0 } ]
+[[layer.anim]]
+property = "y"
+keys = [ { t = 8.1, v = 204.0 }, { t = 8.8, v = 96.0 } ]
+easing = "ease_out_cubic"
+[[layer.anim]]
+property = "scale"
+keys = [ { t = 8.1, v = 1.0 }, { t = 8.8, v = 0.42 } ]
+easing = "ease_out_cubic"
+
+# ── Eye of Horus — stroke pass (traces on, fades after Ignite) ─────────────
+[[layer]]
+type = "path"
+d = "@horus_eye"
+x = 160
+y = 204
+scale = 0.27837
+anchor = "center"
+fill = "none"
+stroke = "gradient:gold"
+stroke_width = 3.2
+glow = 0.5
+glow_radius = 4
+[[layer.anim]]
+property = "trace"
+keys = [ { t = 1.4, v = 0.0 }, { t = 4.53, v = 1.0 } ]
+easing = "ease_in_out_quad"
+[[layer.anim]]
+property = "opacity"
+keys = [ { t = 0.0, v = 0.95 }, { t = 5.0, v = 0.95 }, { t = 5.5, v = 0.0 } ]
+easing = "ease_out_cubic"
+[[layer.anim]]
+property = "y"
+keys = [ { t = 8.1, v = 204.0 }, { t = 8.8, v = 96.0 } ]
+easing = "ease_out_cubic"
+[[layer.anim]]
+property = "scale"
+keys = [ { t = 8.1, v = 0.27837 }, { t = 8.8, v = 0.11692 } ]
+easing = "ease_out_cubic"
+
+# ── Eye of Horus — fill pass (ignites gold) ───────────────────────────────
+[[layer]]
+type = "path"
+d = "@horus_eye"
+x = 160
+y = 204
+scale = 0.27837
+anchor = "center"
+fill = "gradient:gold"
+glow = 0.55
+glow_radius = 5
+[[layer.anim]]
+property = "opacity"
+keys = [ { t = 0.0, v = 0.0 }, { t = 4.8, v = 0.0 }, { t = 5.3, v = 1.0 } ]
+easing = "ease_out_cubic"
+[[layer.anim]]
+property = "y"
+keys = [ { t = 8.1, v = 204.0 }, { t = 8.8, v = 96.0 } ]
+easing = "ease_out_cubic"
+[[layer.anim]]
+property = "scale"
+keys = [ { t = 8.1, v = 0.27837 }, { t = 8.8, v = 0.11692 } ]
+easing = "ease_out_cubic"
+
+# ── Ignite gold flash ────────────────────────────────────────────────────
+[[layer]]
+type = "rect"
+x = 0
+y = 0
+width = 320
+height = 480
+fill = "#ffd9a0"
+blend = "add"
+opacity = 0.0
+[[layer.anim]]
+property = "opacity"
+keys = [ { t = 4.76, v = 0.0 }, { t = 4.89, v = 0.62 }, { t = 5.42, v = 0.0 } ]
+easing = "ease_out_quad"
+
+# ── WORDMARK: HORUS I (letter by letter, morphs to badge label) ───────────
 [[layer]]
 type = "text"
-value = "{{ status }}"
-x = 40
-y = 320
-scale = 2
-color = "#e8f0ff"
+value = "HORUS I"
+font = "cinzel"
+size = 40
+letter_spacing = 0.16
+align = "middle"
+x = 160
+y = 392
+fill = "gradient:gold"
+[[layer.anim]]
+property = "trace"
+keys = [ { t = 6.4, v = 0.0 }, { t = 7.4, v = 1.0 } ]
+[[layer.anim]]
+property = "y"
+keys = [ { t = 6.4, v = 406.0 }, { t = 7.1, v = 392.0 }, { t = 8.15, v = 392.0 }, { t = 8.8, v = 150.0 } ]
+easing = "ease_out_cubic"
+[[layer.anim]]
+property = "scale"
+keys = [ { t = 8.15, v = 1.0 }, { t = 8.8, v = 0.53 } ]
+easing = "ease_out_cubic"
 
-# Progress bar, 0 -> 1 across most of the scene.
+[[layer]]
+type = "text"
+value = "GAMIN CORP"
+font = "rajdhani"
+size = 10
+letter_spacing = 0.34
+align = "middle"
+x = 160
+y = 424
+fill = "#8a4f1f"
+[[layer.anim]]
+property = "opacity"
+keys = [ { t = 0.0, v = 0.0 }, { t = 6.85, v = 0.0 }, { t = 7.4, v = 1.0 } ]
+[[layer.anim]]
+property = "y"
+keys = [ { t = 0.0, v = 424.0 }, { t = 8.15, v = 424.0 }, { t = 8.8, v = 172.0 } ]
+easing = "ease_out_cubic"
+
+# ── HANDOFF dashboard: GPU / CPU / VRAM / FPS ─────────────────────────────
+[[layer]]
+type = "text"
+value = "GPU"
+font = "rajdhani"
+size = 10
+letter_spacing = 0.28
+x = 40
+y = 226
+fill = "#8a4f1f"
+[[layer.anim]]
+property = "opacity"
+keys = [ { t = 0.0, v = 0.0 }, { t = 8.3, v = 0.0 }, { t = 8.7, v = 1.0 } ]
+easing = "ease_out_cubic"
+[[layer.anim]]
+property = "y"
+keys = [ { t = 0.0, v = 242.0 }, { t = 8.3, v = 242.0 }, { t = 8.8, v = 226.0 } ]
+easing = "ease_out_cubic"
+[[layer]]
+type = "text"
+value = "62%"
+font = "mono"
+size = 12
+align = "end"
+x = 280
+y = 226
+fill = "#ffd9a0"
+[[layer.anim]]
+property = "opacity"
+keys = [ { t = 0.0, v = 0.0 }, { t = 8.3, v = 0.0 }, { t = 8.7, v = 1.0 } ]
+easing = "ease_out_cubic"
+[[layer.anim]]
+property = "y"
+keys = [ { t = 0.0, v = 242.0 }, { t = 8.3, v = 242.0 }, { t = 8.8, v = 226.0 } ]
+easing = "ease_out_cubic"
 [[layer]]
 type = "progress_bar"
 x = 40
-y = 360
+y = 234
 width = 240
-height = 14
-color = "#00ff9c"
+height = 2
+fill = "gradient:gold"
 [[layer.anim]]
 property = "value"
-from = 0.0
-to = 1.0
-start = 0.4
-end = 5.6
-easing = "linear"
+keys = [ { t = 0.0, v = 0.0 }, { t = 8.4, v = 0.0 }, { t = 9.0, v = 0.62 } ]
+easing = "ease_in_out_quad"
+[[layer.anim]]
+property = "opacity"
+keys = [ { t = 0.0, v = 0.0 }, { t = 8.3, v = 0.0 }, { t = 8.7, v = 1.0 } ]
+easing = "ease_out_cubic"
+[[layer.anim]]
+property = "y"
+keys = [ { t = 0.0, v = 250.0 }, { t = 8.3, v = 250.0 }, { t = 8.8, v = 234.0 } ]
+easing = "ease_out_cubic"
+
+[[layer]]
+type = "text"
+value = "CPU"
+font = "rajdhani"
+size = 10
+letter_spacing = 0.28
+x = 40
+y = 272
+fill = "#8a4f1f"
+[[layer.anim]]
+property = "opacity"
+keys = [ { t = 0.0, v = 0.0 }, { t = 8.36, v = 0.0 }, { t = 8.76, v = 1.0 } ]
+easing = "ease_out_cubic"
+[[layer.anim]]
+property = "y"
+keys = [ { t = 0.0, v = 288.0 }, { t = 8.36, v = 288.0 }, { t = 8.86, v = 272.0 } ]
+easing = "ease_out_cubic"
+[[layer]]
+type = "text"
+value = "31%"
+font = "mono"
+size = 12
+align = "end"
+x = 280
+y = 272
+fill = "#ffd9a0"
+[[layer.anim]]
+property = "opacity"
+keys = [ { t = 0.0, v = 0.0 }, { t = 8.36, v = 0.0 }, { t = 8.76, v = 1.0 } ]
+easing = "ease_out_cubic"
+[[layer.anim]]
+property = "y"
+keys = [ { t = 0.0, v = 288.0 }, { t = 8.36, v = 288.0 }, { t = 8.86, v = 272.0 } ]
+easing = "ease_out_cubic"
+[[layer]]
+type = "progress_bar"
+x = 40
+y = 280
+width = 240
+height = 2
+fill = "gradient:gold"
+[[layer.anim]]
+property = "value"
+keys = [ { t = 0.0, v = 0.0 }, { t = 8.46, v = 0.0 }, { t = 9.06, v = 0.31 } ]
+easing = "ease_in_out_quad"
+[[layer.anim]]
+property = "opacity"
+keys = [ { t = 0.0, v = 0.0 }, { t = 8.36, v = 0.0 }, { t = 8.76, v = 1.0 } ]
+easing = "ease_out_cubic"
+[[layer.anim]]
+property = "y"
+keys = [ { t = 0.0, v = 296.0 }, { t = 8.36, v = 296.0 }, { t = 8.86, v = 280.0 } ]
+easing = "ease_out_cubic"
+
+[[layer]]
+type = "text"
+value = "VRAM"
+font = "rajdhani"
+size = 10
+letter_spacing = 0.28
+x = 40
+y = 318
+fill = "#8a4f1f"
+[[layer.anim]]
+property = "opacity"
+keys = [ { t = 0.0, v = 0.0 }, { t = 8.42, v = 0.0 }, { t = 8.82, v = 1.0 } ]
+easing = "ease_out_cubic"
+[[layer.anim]]
+property = "y"
+keys = [ { t = 0.0, v = 334.0 }, { t = 8.42, v = 334.0 }, { t = 8.92, v = 318.0 } ]
+easing = "ease_out_cubic"
+[[layer]]
+type = "text"
+value = "4.1 / 8G"
+font = "mono"
+size = 12
+align = "end"
+x = 280
+y = 318
+fill = "#ffd9a0"
+[[layer.anim]]
+property = "opacity"
+keys = [ { t = 0.0, v = 0.0 }, { t = 8.42, v = 0.0 }, { t = 8.82, v = 1.0 } ]
+easing = "ease_out_cubic"
+[[layer.anim]]
+property = "y"
+keys = [ { t = 0.0, v = 334.0 }, { t = 8.42, v = 334.0 }, { t = 8.92, v = 318.0 } ]
+easing = "ease_out_cubic"
+[[layer]]
+type = "progress_bar"
+x = 40
+y = 326
+width = 240
+height = 2
+fill = "gradient:gold"
+[[layer.anim]]
+property = "value"
+keys = [ { t = 0.0, v = 0.0 }, { t = 8.52, v = 0.0 }, { t = 9.12, v = 0.51 } ]
+easing = "ease_in_out_quad"
+[[layer.anim]]
+property = "opacity"
+keys = [ { t = 0.0, v = 0.0 }, { t = 8.42, v = 0.0 }, { t = 8.82, v = 1.0 } ]
+easing = "ease_out_cubic"
+[[layer.anim]]
+property = "y"
+keys = [ { t = 0.0, v = 342.0 }, { t = 8.42, v = 342.0 }, { t = 8.92, v = 326.0 } ]
+easing = "ease_out_cubic"
+
+[[layer]]
+type = "text"
+value = "FPS"
+font = "rajdhani"
+size = 10
+letter_spacing = 0.28
+x = 40
+y = 364
+fill = "#8a4f1f"
+[[layer.anim]]
+property = "opacity"
+keys = [ { t = 0.0, v = 0.0 }, { t = 8.48, v = 0.0 }, { t = 8.88, v = 1.0 } ]
+easing = "ease_out_cubic"
+[[layer.anim]]
+property = "y"
+keys = [ { t = 0.0, v = 380.0 }, { t = 8.48, v = 380.0 }, { t = 8.98, v = 364.0 } ]
+easing = "ease_out_cubic"
+[[layer]]
+type = "text"
+value = "87"
+font = "mono"
+size = 12
+align = "end"
+x = 280
+y = 364
+fill = "#ffd9a0"
+[[layer.anim]]
+property = "opacity"
+keys = [ { t = 0.0, v = 0.0 }, { t = 8.48, v = 0.0 }, { t = 8.88, v = 1.0 } ]
+easing = "ease_out_cubic"
+[[layer.anim]]
+property = "y"
+keys = [ { t = 0.0, v = 380.0 }, { t = 8.48, v = 380.0 }, { t = 8.98, v = 364.0 } ]
+easing = "ease_out_cubic"
+[[layer]]
+type = "progress_bar"
+x = 40
+y = 372
+width = 240
+height = 2
+fill = "gradient:gold"
+[[layer.anim]]
+property = "value"
+keys = [ { t = 0.0, v = 0.0 }, { t = 8.58, v = 0.0 }, { t = 9.18, v = 0.72 } ]
+easing = "ease_in_out_quad"
+[[layer.anim]]
+property = "opacity"
+keys = [ { t = 0.0, v = 0.0 }, { t = 8.48, v = 0.0 }, { t = 8.88, v = 1.0 } ]
+easing = "ease_out_cubic"
+[[layer.anim]]
+property = "y"
+keys = [ { t = 0.0, v = 388.0 }, { t = 8.48, v = 388.0 }, { t = 8.98, v = 372.0 } ]
+easing = "ease_out_cubic"
+
+# ── Vignette ─────────────────────────────────────────────────────────────
+[[layer]]
+type = "rect"
+x = 0
+y = 0
+width = 320
+height = 480
+fill = "gradient:vignette"
+
+# ── Power white flash ────────────────────────────────────────────────────
+[[layer]]
+type = "rect"
+x = 0
+y = 0
+width = 320
+height = 480
+fill = "#ffffff"
+blend = "add"
+opacity = 0.0
+[[layer.anim]]
+property = "opacity"
+keys = [ { t = 0.0, v = 0.85 }, { t = 0.05, v = 0.5 }, { t = 0.34, v = 0.0 } ]
+easing = "ease_out_quad"
+
+# ── Outro fade to black (loop reset) ─────────────────────────────────────
+[[layer]]
+type = "rect"
+x = 0
+y = 0
+width = 320
+height = 480
+fill = "#05060a"
+opacity = 0.0
+[[layer.anim]]
+property = "opacity"
+keys = [ { t = 0.0, v = 0.0 }, { t = 9.82, v = 0.0 }, { t = 10.0, v = 1.0 } ]
+easing = "ease_out_cubic"

@@ -12,31 +12,22 @@ CC0 vector (freesvg.org #176178), recoloured for this project.
 | `horus-lockup-seal.svg` | large **seal** (with ring) tight above the wordmark, 700×672 | badge / hero lockup |
 
 Palette: ink `#0e0e12` / `#202029`, gold `#8a6f37` → `#c9a24b` → `#eece86`, lapis `#2a5583`.
-Fonts in the original mock: *Cinzel* (wordmark), *Rajdhani* (labels).
+Fonts: *Cinzel* (wordmark), *Rajdhani* (labels), *JetBrains Mono* (values) — all
+SIL OFL, vendored in `assets/fonts/` and embedded in the daemon.
 
-**Web font caveat:** the wordmark SVGs pull *Cinzel* from Google Fonts (`@font-face` in
-`<defs>`). It renders correctly in a browser online; offline or when rasterising it
-falls back to a serif. For a fully portable asset, open the file in Inkscape and
-*Path → Object to Path* on the text, or `inkscape --export-text-to-path`.
+`horus-eye.d` is the eye outline's raw `d` string (the scene engine embeds it as
+`renderer::HORUS_EYE_PATH`, referenced from scenes as `d = "@horus_eye"`).
+
+**Web font caveat (SVG files only):** the wordmark SVGs pull *Cinzel* from Google
+Fonts (`@font-face` in `<defs>`) — fine in a browser online, falls back to a serif
+offline / when rasterising. The scene engine does **not** use the SVGs for text;
+it renders the vendored TTFs directly.
 
 ## On the 3.5" panel
 
-The scene engine's `image` layer wants raster (PNG), not SVG. Rasterise once:
+The scene engine draws the eye as a live `path` layer (`d = "@horus_eye"`), so no
+PNG is needed. If you do want a raster seal for an `image` layer, rasterise once:
 
 ```sh
-# any of these
 rsvg-convert -w 240 -h 240 assets/logo/horus-seal.svg -o assets/logo/horus-seal-240.png
-inkscape assets/logo/horus-seal.svg --export-type=png -w 240 -o assets/logo/horus-seal-240.png
-```
-
-then reference it from a scene:
-
-```toml
-[[layer]]
-type = "image"
-source = "../logo/horus-seal-240.png"
-x = 40
-y = 40
-width = 240
-height = 240
 ```

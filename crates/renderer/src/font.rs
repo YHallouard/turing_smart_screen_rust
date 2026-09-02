@@ -1,6 +1,57 @@
-//! A minimal built-in 5x7 uppercase bitmap font, so the daemon can draw text
-//! with zero asset files. TTF support (via `fontdue`) can be layered on later
-//! behind the same `Canvas::draw_text` call.
+//! Text: a minimal built-in 5x7 uppercase bitmap font (zero-asset fallback) plus
+//! a [`Fonts`] registry of the vendored OFL TTFs (Cinzel, Rajdhani, JetBrains
+//! Mono) rasterised through `fontdue`.
+
+use fontdue::{Font, FontSettings};
+
+/// The vendored TTFs, parsed once. Embedded in the binary via `include_bytes!`.
+pub struct Fonts {
+    cinzel: Font,
+    rajdhani: Font,
+    mono: Font,
+}
+
+impl Fonts {
+    pub fn embedded() -> Self {
+        let load = |bytes: &[u8]| {
+            Font::from_bytes(bytes, FontSettings::default()).expect("bundled font is valid")
+        };
+        Fonts {
+            cinzel: load(include_bytes!("../../../assets/fonts/Cinzel-SemiBold.ttf")),
+            rajdhani: load(include_bytes!(
+                "../../../assets/fonts/Rajdhani-SemiBold.ttf"
+            )),
+            mono: load(include_bytes!(
+                "../../../assets/fonts/JetBrainsMono-Regular.ttf"
+            )),
+        }
+    }
+
+    /// Font for a scene `font = "..."` name. Unknown -> Rajdhani.
+    pub fn get(&self, name: &str) -> &Font {
+        match name {
+            "cinzel" => &self.cinzel,
+            "mono" | "jetbrains" | "jetbrains_mono" => &self.mono,
+            _ => &self.rajdhani,
+        }
+    }
+
+    /// Total advance width of `text` at pixel size `px` with `tracking` extra
+    /// pixels between glyphs.
+    pub fn measure(&self, name: &str, text: &str, px: f32, tracking: f32) -> f32 {
+        let font = self.get(name);
+        let n = text.chars().count();
+        let adv: f32 = text
+            .chars()
+            .map(|c| font.metrics(c, px).advance_width)
+            .sum();
+        adv + if n > 1 {
+            tracking * (n - 1) as f32
+        } else {
+            0.0
+        }
+    }
+}
 
 /// Glyph cell width in pixels at scale 1.
 pub const GLYPH_W: i32 = 5;
