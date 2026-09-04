@@ -1,0 +1,102 @@
+# Horus I — panneau "lancement de jeu", portrait (320x480). Le daemon le joue
+# une fois (~4 s) quand un jeu Steam démarre, puis rend la main au dashboard.
+#
+# Version simple : le jeu + une seule stat (`[steam] launch_stat`, par défaut la
+# progression des succès). Pas d'étapes qui défilent, pas de barre qui se remplit
+# — juste un fondu d'entrée, un hold, un fondu de sortie.
+#
+# `{{ game.name }}` / `{{ game.subtitle }}` / `{{ game.stat_frac }}` : daemon.
+# ASSET : assets/launch/cover.png (160x160 RGBA), blitté * scale.
+
+[scene]
+name = "launch_game"
+duration = 10
+background = "#05060a"
+orientation = "portrait"
+
+[[layer]]
+type = "rect"
+x = 30
+y = 96
+width = 260
+height = 2
+color = "#eece86"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.4, v = 0 }, { t = 0.9, v = 1 }, { t = 9.9, v = 1 }, { t = 9.95, v = 0 }]
+easing = "ease_out"
+
+[[layer]]
+type = "text"
+value = "LANCEMENT"
+x = 107
+y = 114
+scale = 2
+color = "#8a6f37"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.4, v = 0 }, { t = 0.9, v = 1 }, { t = 9.9, v = 1 }, { t = 9.95, v = 0 }]
+easing = "ease_out"
+
+[[layer]]
+type = "image"
+source = "../launch/cover.png"
+x = 96
+y = 148
+width = 128
+height = 128
+scale = 0.8
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.4, v = 0 }, { t = 0.9, v = 1 }, { t = 9.9, v = 1 }, { t = 9.95, v = 0 }]
+easing = "ease_out"
+
+[[layer]]
+type = "text"
+value = "{{ game.name }}"
+x = 42
+y = 310
+scale = 4
+max_width = 264
+color = "#eece86"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.4, v = 0 }, { t = 0.9, v = 1 }, { t = 9.9, v = 1 }, { t = 9.95, v = 0 }]
+easing = "ease_out"
+
+[[layer]]
+type = "text"
+value = "{{ game.subtitle }}"
+x = 47
+y = 352
+scale = 2
+color = "#c9a24b"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.4, v = 0 }, { t = 0.9, v = 1 }, { t = 9.9, v = 1 }, { t = 9.95, v = 0 }]
+easing = "ease_out"
+
+[[layer]]
+type = "progress_bar"
+value = "{{ game.stat_frac }}"
+x = 40
+y = 378
+width = 240
+height = 6
+color = "#c9a24b"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.4, v = 0 }, { t = 0.9, v = 1 }, { t = 9.9, v = 1 }, { t = 9.95, v = 0 }]
+easing = "ease_out"
+
+[[layer]]
+type = "text"
+value = "HORUS I"
+x = 119
+y = 430
+scale = 2
+color = "#2e2717"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.4, v = 0 }, { t = 0.9, v = 1 }, { t = 9.9, v = 1 }, { t = 9.95, v = 0 }]
+easing = "ease_out"

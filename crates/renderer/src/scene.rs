@@ -69,6 +69,8 @@ fn default_background() -> String {
 pub enum LayerKind {
     Text,
     Rect,
+    /// Outlined rectangle (border only): `stroke`/`color` + `stroke_width`.
+    StrokeRect,
     Image,
     ProgressBar,
     Path,
@@ -172,6 +174,10 @@ pub struct Layer {
     /// `0..1` fraction of the letters revealed (whole-run reveal).
     #[serde(default)]
     pub letter_reveal: Option<f32>,
+    /// Max width in px for a `text` layer. A longer bitmap-font string is
+    /// truncated with `...`. Ignored for TTF text and other layer kinds.
+    #[serde(default)]
+    pub max_width: Option<f32>,
 
     /// Glow (blur halo) strength `0..1`, and its blur radius in px.
     #[serde(default)]

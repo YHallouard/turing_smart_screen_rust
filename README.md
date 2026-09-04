@@ -14,16 +14,20 @@ Phase 1–2 of the plan:
 
 | Crate | What it does | State |
 |-------|--------------|-------|
-| `crates/turzx` | `Frame`, `DisplayBackend` trait, `Orientation`, dirty-region tracking, USB serial driver (`serial` feature) | trait + preview solid; **serial protocol is an unverified skeleton** |
+| `crates/turzx` | `Frame`, `DisplayBackend` trait, `Orientation`, dirty-region tracking, USB serial driver (`serial` feature) | trait + preview solid; **serial protocol = confirmed rev A** (`USB35INCHIPSV2`, see `docs/PROTOCOL.md`) |
 | `crates/renderer` | TOML scene engine on `tiny_skia` (AA paths, gradients, transforms, additive blend, glow) + `fontdue` TTF text; multi-keyframe animation | working |
 | `crates/preview` | non-hardware backends: PNG dump + desktop window (`window` feature) | working |
-| `daemon` (`bc250-dashboard`) | loads the orientation-specific scene, plays it through a backend | working |
+| `daemon` (`bc250-dashboard`) | `--mode sequence` (default): boot scene once, then the live dashboard forever from sysfs / `nvidia-smi` / MangoHud; `--mode single`: play one scene and exit | working |
 
-The reference **"Boot Horus I"** animation (10 s, both orientations — power sweep,
-eye traced then ignited in gold, wordmark, seal→badge handoff, GPU/CPU/VRAM/FPS
-dashboard) is implemented in `assets/scenes/boot.{portrait,landscape}.toml`.
+**Boot + dashboard** (`assets/scenes/{boot,dashboard}.{portrait,landscape}.toml`):
+a minimal-motion boot — static Horus seal, name fades in, hard cut — then a
+GPU/CPU/VRAM/FPS/temps dashboard fed by live sensors. Re-authored for the real
+rev-A panel (full-screen repaint ≈ 1 s); see `docs/BOOT_HORUS.md`.
 
-Not yet started: Steam detection, sensors, the event engine, a wider scene library.
+Hardware alerts (GPU temp / VRAM / fan-stopped) preempt the dashboard with a
+full-screen scene while a reading is past its threshold; a Steam achievement
+unlock pops `notify.achievement` for a few seconds — see **Alerts** below.
+Not yet started: a wider scene library, a "now playing" dashboard line.
 
 ## Build & test
 
@@ -39,35 +43,118 @@ The default workspace build has **no system dependencies** (PNG backend only;
 Fonts (Cinzel, Rajdhani, JetBrains Mono — all SIL OFL) are vendored under
 `assets/fonts/` and embedded in the binary; see `assets/fonts/OFL-*.txt`.
 
-## Run
+## Install
 
-Render the boot scene to `target/frames/*.png`:
+### `.deb` (Debian / Ubuntu / Pop!_OS)
 
 ```sh
-cargo run -p bc250-dashboard -- --backend png
-# deterministic filmstrip (step scene time by 1/fps, ignore the wall clock):
-cargo run -p bc250-dashboard -- --backend png --capture --fps 30 --out target/frames
+sudo apt install pkg-config libudev-dev dpkg-dev   # build deps
+make deb                                           # -> dist/bc250-dashboard_<ver>_amd64.deb
+sudo apt install ./dist/bc250-dashboard_*.deb      # that's it
 ```
 
-Live preview window — the way to iterate on animations on a Mac/desktop, no
-hardware needed:
+The `.deb`'s `postinst` reloads udev, enables the systemd **user** unit for all
+users, and — since `sudo` tells it who you are — does `daemon-reload` +
+`enable --now` + `restart` in your session and `loginctl enable-linger` so it also
+starts at boot before login. No manual `systemctl` step.
+
+Installs `/usr/bin/bc250-dashboard` (with the `config` subcommand), assets under
+`/usr/share/bc250-dashboard`, the udev rule (`/lib/udev/rules.d/70-turzx-panel.rules`
+→ `/dev/turzx-panel`, world-rw), the user unit in `/usr/lib/systemd/user/`, and
+`/etc/bc250-dashboard/config.toml` (a per-user copy is seeded into
+`~/.config/bc250-dashboard/` on first run). Each `make deb` stamps a newer
+version, so upgrading is just `make deb && sudo apt install ./dist/*.deb`. Logs:
+`journalctl --user -u bc250-dashboard -f`. Remove with `sudo apt remove
+bc250-dashboard`.
+
+> Already ran `make install` (below) once? Its unit in `~/.config/systemd/user/`
+> shadows the packaged one — run `make uninstall` before the first `apt install`.
+
+> Bazzite / SteamOS are rpm/ostree — `apt` isn't available there; use
+> `make install` below (writes only to `~/.local` + one udev rule).
+
+### From a checkout (no packaging)
 
 ```sh
-cargo run -p bc250-dashboard --features window -- --backend window --loop
+make install        # per-user: ~/.local/bin, ~/.local/share, ~/.config, user unit
+make install-udev   # one-time, sudo: the udev rule + /dev/turzx-panel
+make enable         # systemctl --user enable --now + loginctl enable-linger
 ```
 
-Drive the real panel over USB serial (works from macOS too — the panel is just a
-serial device at `/dev/cu.usbmodem*`). The protocol is unverified, so expect
-garbage until Phase 1 is done:
+`make disable` / `make uninstall` to undo.
+
+### What the service does
+
+`--mode sequence`: boot animation, then the live dashboard. It writes a managed
+block into `~/.config/MangoHud/MangoHud.conf` (`autostart_log` / `log_interval` /
+`output_folder`) so in-game FPS is logged and picked up automatically — set
+`[sensors] manage_mangohud = false` to opt out. It also prunes old FPS CSVs
+(`mangohud_prune_hours`, default 24).
+
+### Alerts
+
+While the dashboard is up the daemon watches the same sensors and, when one
+crosses its threshold, takes over the panel with `assets/scenes/alert.<orientation>.toml`
+— a parametric full-screen scene the daemon fills with the live value, the
+threshold, and a suggested action. It clears once the reading drops back past a
+lower `*_clear` threshold (hysteresis) and `min_secs` has elapsed; a
+higher-precedence alert (fan-stopped > GPU temp > VRAM) preempts immediately.
+Tune or disable it under `[alerts]` in `config.toml` (or `bc250-dashboard config
+set alerts.gpu_temp_c 90`).
+
+### Steam (`[steam]`, default on)
+
+The daemon finds the running Steam game from `/proc/<pid>/environ`
+(`SteamAppId`), then reads Steam's own local caches under
+`~/.steam/…/appcache/stats/` — no Steamworks link, no Web API key, no network.
+
+- **Launch card** — when a game starts, `launch.<orientation>.toml` plays for
+  ~10 s: the game name + one stat (`launch_stat`, default the achievement
+  `unlocked / total`), a fade in / hold / fade out. `launch_animation = false`
+  to skip it.
+- **Achievement popup** — a fresh unlock in
+  `UserGameStats_<account>_<appid>.bin` pops `notify.achievement` (name, game,
+  `unlocked / total`) for `achievement_secs`.
+
+Precedence: a hardware alert preempts either; the launch card preempts the
+achievement popup.
+
+### Configure from the CLI
 
 ```sh
+bc250-dashboard config show                         # every setting + effective value
+bc250-dashboard config set panel.orientation landscape
+bc250-dashboard config set sensors.gpu nvidia       # auto | amd | nvidia
+bc250-dashboard config set sensors.fps_bar_max 144
+bc250-dashboard config get sensors.gpu
+bc250-dashboard config edit                         # $EDITOR the file
+systemctl --user restart bc250-dashboard            # apply
+```
+
+Edits are format-preserving and validated before they are written (a bad value
+is refused, not saved). Target file:
+`$XDG_CONFIG_HOME/bc250-dashboard/config.toml` (`--file` to override).
+
+## Run (from a checkout)
+
+```sh
+# deterministic filmstrip, no hardware:
+cargo run -p bc250-dashboard -- --backend png --mode single --capture --fps 30 \
+  --scene assets/scenes/boot.toml --out target/frames
+
+# live preview window (iterate on animations on a desktop):
+cargo run -p bc250-dashboard --features window -- --backend window --mode single --loop \
+  --scene assets/scenes/boot.toml
+
+# the real panel: boot, then the live dashboard (Ctrl-C to stop):
 cargo run -p bc250-dashboard --features serial -- --backend serial
-# or point at a specific device:
-cargo run -p bc250-dashboard --features serial -- --backend serial --port /dev/cu.usbmodem1101
 ```
 
-macOS needs nothing extra. On Linux the `serial` feature links `libudev`, so
-install `pkg-config` + `libudev-dev` (`libudev-devel` on Fedora/Bazzite) first.
+The panel is a serial device (`/dev/ttyACM*` on Linux, `/dev/cu.usbmodem*` on
+macOS); the wire protocol is the confirmed "revision A" one (`docs/PROTOCOL.md`).
+Without the udev rule the node is `root:dialout` — add yourself to that group
+(`sudo usermod -aG dialout $USER`, re-login) or run with `sudo`. On Linux the
+`serial` feature links `libudev` (`pkg-config` + `libudev-dev`).
 
 ## Orientation
 
@@ -95,9 +182,11 @@ Scenes are TOML (`assets/scenes/*.toml`):
 - `[[gradient]]` — `name`, `kind` (`linear`/`radial`), `axis`
   (`vertical`/`horizontal`), `stops = [{ at, color }]`.
 - `[[layer]]` — `type` is `text` (bitmap 5×7 or, with `font =
-  "cinzel"|"rajdhani"|"mono"`, TTF at `size`, `letter_spacing`, `align`),
-  `rect`, `image`, `progress_bar`, `path` (`d = "@horus_eye"` or inline / an
-  `.svg`), `circle` (`radius`), or `scanlines`. Common fields: `x/y/width/height`,
+  "cinzel"|"rajdhani"|"mono"`, TTF at `size`, `letter_spacing`, `align`;
+  `max_width` truncates an over-long bitmap string with `...`),
+  `rect`, `stroke_rect` (border only: `stroke`/`color` + `stroke_width`),
+  `image`, `progress_bar`, `path` (`d = "@horus_eye"` or inline / an `.svg`),
+  `circle` (`radius`), or `scanlines`. Common fields: `x/y/width/height`,
   `scale`, `rotation`, `anchor` (`top_left`/`center`), `fill`/`stroke`
   (paint spec), `stroke_width`, `blend` (`normal`/`add`), `glow` + `glow_radius`,
   `trace` (0..1 outline / letter reveal).

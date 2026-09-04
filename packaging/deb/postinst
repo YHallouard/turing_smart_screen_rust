@@ -1,0 +1,41 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "configure" ]; then
+    # --- panel device access -------------------------------------------------
+    udevadm control --reload-rules 2>/dev/null || true
+    udevadm trigger --subsystem-match=tty --attr-match=idVendor=1a86 2>/dev/null || true
+    for d in /dev/ttyACM*; do
+        [ -e "$d" ] && chmod 666 "$d" 2>/dev/null || true
+    done
+
+    # --- enable the systemd *user* unit for every user ----------------------
+    # Takes effect on next login / boot for all users.
+    if command -v deb-systemd-helper >/dev/null 2>&1; then
+        deb-systemd-helper --user enable bc250-dashboard.service >/dev/null 2>&1 || true
+    else
+        systemctl --global enable bc250-dashboard.service >/dev/null 2>&1 || true
+    fi
+
+    # --- act on the installing user's running session, if there is one -----
+    if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != root ] && command -v loginctl >/dev/null 2>&1; then
+        uid="$(id -u "$SUDO_USER" 2>/dev/null || true)"
+        if [ -n "$uid" ] && [ -d "/run/user/$uid" ]; then
+            run_user() {
+                sudo -u "$SUDO_USER" XDG_RUNTIME_DIR="/run/user/$uid" "$@" 2>/dev/null || true
+            }
+            run_user systemctl --user daemon-reload
+            run_user systemctl --user enable --now bc250-dashboard.service
+            run_user systemctl --user restart bc250-dashboard.service
+            # start it at boot without a login, too
+            loginctl enable-linger "$SUDO_USER" 2>/dev/null || true
+            echo "bc250-dashboard: running for $SUDO_USER and enabled at boot."
+        fi
+    else
+        echo "bc250-dashboard: enabled for all users; starts on next login / boot."
+        echo "  now, without relogin:   systemctl --user start bc250-dashboard"
+        echo "  at boot before login:   loginctl enable-linger \$USER"
+    fi
+fi
+
+exit 0

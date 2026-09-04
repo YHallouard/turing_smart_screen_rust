@@ -1,0 +1,146 @@
+# Horus I — alerte matérielle, portrait (320x480). SCÈNE PARAMÉTRIQUE :
+# la géométrie est fixe, le daemon remplit les `{{ alert.* }}` selon l'alerte
+# active (fan / gpu_temp / vram — voir daemon/src/alerts.rs::overlay).
+#
+# STATIQUE PAR CHOIX : pas de clignotement, un hard cut à l'entrée puis l'image
+# tient tant que la mesure dépasse le seuil (hystérésis + min_secs côté daemon).
+
+[scene]
+name = "alert"
+duration = 8.0
+background = "#05060a"
+orientation = "portrait"
+
+[[layer]]
+type = "stroke_rect"
+x = 0
+y = 0
+width = 320
+height = 480
+stroke_width = 3
+color = "#ff5b4a"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }]
+easing = "linear"
+
+[[layer]]
+type = "rect"
+x = 0
+y = 140
+width = 320
+height = 200
+color = "#14060a"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }]
+easing = "linear"
+
+[[layer]]
+type = "rect"
+x = 0
+y = 140
+width = 320
+height = 3
+color = "#ff5b4a"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }]
+easing = "linear"
+
+[[layer]]
+type = "rect"
+x = 0
+y = 339
+width = 320
+height = 1
+color = "#ff5b4a"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 0.5 }]
+easing = "linear"
+
+[[layer]]
+type = "text"
+value = "{{ alert.title }}"
+x = 40
+y = 156
+scale = 2
+color = "#ff5b4a"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }]
+easing = "linear"
+
+[[layer]]
+type = "text"
+value = "{{ alert.label }}"
+x = 40
+y = 182
+scale = 2
+color = "#a8564a"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }]
+easing = "linear"
+
+[[layer]]
+type = "text"
+value = "{{ alert.value }}"
+x = 80
+y = 200
+scale = 6
+color = "#ff5b4a"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }]
+easing = "linear"
+
+[[layer]]
+type = "text"
+value = "{{ alert.threshold }}"
+x = 40
+y = 262
+scale = 2
+color = "#a8564a"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }]
+easing = "linear"
+
+[[layer]]
+type = "progress_bar"
+value = "{{ alert.frac }}"
+x = 40
+y = 286
+width = 240
+height = 6
+color = "#ff5b4a"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }]
+easing = "linear"
+
+[[layer]]
+type = "text"
+value = "{{ alert.action }}"
+x = 40
+y = 308
+scale = 2
+color = "#ffb340"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }]
+easing = "linear"
+
+[[layer]]
+type = "text"
+value = "HORUS I"
+x = 198
+y = 60
+scale = 2
+color = "#4a2b26"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }]
+easing = "linear"

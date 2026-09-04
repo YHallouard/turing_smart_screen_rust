@@ -25,9 +25,30 @@ it renders the vendored TTFs directly.
 
 ## On the 3.5" panel
 
-The scene engine draws the eye as a live `path` layer (`d = "@horus_eye"`), so no
-PNG is needed. If you do want a raster seal for an `image` layer, rasterise once:
+The boot scene (`assets/scenes/boot.{portrait,landscape}.toml`) uses a raster
+seal in an `image` layer: **`horus-seal-240.png`** (240², committed). Regenerate
+it from the SVG if the artwork changes:
 
 ```sh
 rsvg-convert -w 240 -h 240 assets/logo/horus-seal.svg -o assets/logo/horus-seal-240.png
 ```
+
+If `rsvg-convert` isn't installed but `librsvg` is (Pop!_OS/Ubuntu ship the lib
+without the CLI), rasterise via PyGObject + cairo — and strip the
+`filter="url(#hs-shadow)"` drop-shadow first, some librsvg builds drop the glyph
+inside a filtered group:
+
+```python
+import gi; gi.require_version("Rsvg", "2.0")
+from gi.repository import Rsvg
+import cairo
+svg = open("assets/logo/horus-seal.svg").read().replace(' filter="url(#hs-shadow)"', "")
+h = Rsvg.Handle.new_from_data(svg.encode())
+s = cairo.ImageSurface(cairo.FORMAT_ARGB32, 240, 240)
+c = cairo.Context(s); c.scale(240/512, 240/512); h.render_cairo(c)
+s.write_to_png("assets/logo/horus-seal-240.png")
+```
+
+The scene engine can also draw the eye as a live `path` layer
+(`d = "@horus_eye"`) with no PNG — but that is the bare glyph, without the seal's
+rings and plate.

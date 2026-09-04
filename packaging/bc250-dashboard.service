@@ -1,0 +1,27 @@
+# systemd *user* unit.
+#  - `make install`  copies this to ~/.config/systemd/user/ (paths: ~/.local)
+#  - `make deb`      rewrites the ~/.local paths to /usr and ships it in the .deb
+# `make enable` / the .deb's postinst message do `systemctl --user enable --now`
+# plus `loginctl enable-linger` so it also starts at boot before login.
+
+[Unit]
+Description=BC-250 / TURZX 3.5" USB panel — boot animation + live dashboard
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+# Scenes / fonts / logo are resolved relative to this directory.
+WorkingDirectory=%h/.local/share/bc250-dashboard
+# Seed a per-user config from the packaged default on first run (ignored if the
+# default isn't installed, e.g. a plain `make install`).
+ExecStartPre=-/bin/sh -c 'mkdir -p %h/.config/bc250-dashboard; test -f %h/.config/bc250-dashboard/config.toml || cp /etc/bc250-dashboard/config.toml %h/.config/bc250-dashboard/config.toml'
+# Wait up to 30 s for the panel to enumerate; start anyway and let Restart cope.
+ExecStartPre=/bin/sh -c 'for i in $(seq 30); do [ -e /dev/turzx-panel ] && exit 0; sleep 1; done; exit 0'
+ExecStart=%h/.local/bin/bc250-dashboard --backend serial --port /dev/turzx-panel --config %h/.config/bc250-dashboard/config.toml
+Restart=on-failure
+RestartSec=3
+Nice=5
+
+[Install]
+WantedBy=default.target

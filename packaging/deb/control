@@ -1,0 +1,17 @@
+Package: bc250-dashboard
+Version: @VERSION@
+Architecture: amd64
+Maintainer: Yann HALLOUARD <yann.hal@gmail.com>
+Depends: libc6, libudev1, init-system-helpers
+Recommends: mangohud
+Section: utils
+Priority: optional
+Description: TURZX 3.5" USB panel — boot animation + live system dashboard
+ Drives a TURZX / Turing 3.5" (320x480) USB-C secondary screen: a minimal-motion
+ boot animation, then a permanent GPU / CPU / VRAM / FPS / temperature dashboard
+ fed by sysfs, nvidia-smi and MangoHud's CSV log. Dirty-region rendering keeps
+ the panel writes tiny.
+ .
+ Ships a systemd --user unit; after install run
+ `systemctl --user enable --now bc250-dashboard` (and `loginctl enable-linger`
+ to start it at boot before login).

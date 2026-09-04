@@ -1,0 +1,117 @@
+# Horus I — panneau "succès Steam débloqué".
+# Généré depuis scenes-alerts.js (source unique : le préview HTML
+# "Notifications & Alertes.dc.html" joue exactement ces layers).
+#
+# STATIQUE PAR CHOIX : le panneau est vu de loin et son rafraîchissement ne rend
+# pas le mouvement — donc un hard cut, un hold de 7,8 s (le temps de lire), un
+# hard cut. Aucun glissement, aucune cascade, aucun remplissage progressif.
+#
+# ASSET : assets/notify/achievement.png (128x128 RGBA). Le moteur blitte l'image
+# à sa taille native x `scale` (il ignore width/height), d'où `scale = 96/128`
+# ici pour la vignette 96x96 du portrait.
+
+[scene]
+name = "notify_achievement"
+duration = 8.0
+background = "#05060a"
+orientation = "portrait"
+
+[[layer]]
+type = "rect"
+x = 30
+y = 84
+width = 260
+height = 2
+color = "#eece86"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }, { t = 7.8, v = 1 }, { t = 7.83, v = 0 }]
+easing = "linear"
+
+[[layer]]
+type = "rect"
+x = 30
+y = 432
+width = 260
+height = 1
+color = "#8a6f37"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }, { t = 7.8, v = 1 }, { t = 7.83, v = 0 }]
+easing = "linear"
+
+[[layer]]
+type = "text"
+value = "SUCCES DEBLOQUE"
+x = 27
+y = 104
+scale = 3
+color = "#8a6f37"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }, { t = 7.8, v = 1 }, { t = 7.83, v = 0 }]
+easing = "linear"
+
+[[layer]]
+type = "image"
+source = "../notify/achievement.png"
+x = 112
+y = 150
+width = 96
+height = 96
+scale = 0.75
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }, { t = 7.8, v = 1 }, { t = 7.83, v = 0 }]
+easing = "linear"
+
+[[layer]]
+type = "text"
+value = "{{ achievement.name }}"
+x = 42
+y = 282
+scale = 4
+max_width = 264
+color = "#eece86"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }, { t = 7.8, v = 1 }, { t = 7.83, v = 0 }]
+easing = "linear"
+
+[[layer]]
+type = "text"
+value = "{{ game.name }}"
+x = 101
+y = 336
+scale = 2
+max_width = 190
+color = "#c9a24b"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }, { t = 7.8, v = 1 }, { t = 7.83, v = 0 }]
+easing = "linear"
+
+[[layer]]
+type = "text"
+value = "{{ achievement.progress }}"
+x = 77
+y = 366
+scale = 2
+color = "#5f4e2c"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }, { t = 7.8, v = 1 }, { t = 7.83, v = 0 }]
+easing = "linear"
+
+[[layer]]
+type = "progress_bar"
+value = "{{ achievement.frac }}"
+x = 40
+y = 396
+width = 240
+height = 6
+color = "#c9a24b"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }, { t = 7.8, v = 1 }, { t = 7.83, v = 0 }]
+easing = "linear"

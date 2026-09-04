@@ -1,0 +1,68 @@
+# Dirty-region smoothness probe.
+#
+# Fixed black background + a static label (painted once, never again) + three
+# small rectangles that move. Every frame only the union of each rect's old and
+# new box is redrawn — a few KB instead of the full 307 KB screen — so on the
+# real rev A panel this should run visibly smoother than the full-screen boot
+# intro (which repaints everything every frame).
+#
+#   cargo run -p bc250-dashboard --features serial -- \
+#     --backend serial --port /dev/ttyACM0 --scene assets/scenes/motion-test.toml --loop
+
+[scene]
+name = "motion-test"
+duration = 6.0
+background = "#000000"
+orientation = "portrait"
+
+# Static reference text — never changes, so it is sent exactly once (frame 1).
+[[layer]]
+type = "text"
+value = "REGION TEST"
+x = 92
+y = 34
+scale = 2
+fill = "#4a5568"
+
+# Horizontal slider: 46x46 gold square, left -> right -> left, linear.
+[[layer]]
+type = "rect"
+width = 46
+height = 46
+x = 20
+y = 150
+fill = "#ffd9a0"
+[[layer.anim]]
+property = "x"
+easing = "linear"
+keys = [ { t = 0.0, v = 20.0 }, { t = 3.0, v = 254.0 }, { t = 6.0, v = 20.0 } ]
+
+# Vertical slider: 30x30 cyan square, eased down and back.
+[[layer]]
+type = "rect"
+width = 30
+height = 30
+x = 145
+y = 250
+fill = "#7fdfff"
+[[layer.anim]]
+property = "y"
+easing = "ease_in_out"
+keys = [ { t = 0.0, v = 250.0 }, { t = 3.0, v = 410.0 }, { t = 6.0, v = 250.0 } ]
+
+# Diagonal mover: 26x26 green square, both axes at once.
+[[layer]]
+type = "rect"
+width = 26
+height = 26
+x = 40
+y = 300
+fill = "#9dff6b"
+[[layer.anim]]
+property = "x"
+easing = "ease_in_out"
+keys = [ { t = 0.0, v = 40.0 }, { t = 3.0, v = 250.0 }, { t = 6.0, v = 40.0 } ]
+[[layer.anim]]
+property = "y"
+easing = "ease_in_out"
+keys = [ { t = 0.0, v = 300.0 }, { t = 1.5, v = 372.0 }, { t = 3.0, v = 300.0 }, { t = 4.5, v = 372.0 }, { t = 6.0, v = 300.0 } ]

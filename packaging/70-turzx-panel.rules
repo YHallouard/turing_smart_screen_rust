@@ -1,0 +1,7 @@
+# TURZX / Turing 3.5" USB-C panel (QinHeng CH34x, VID 1a86 PID 5722).
+#
+# `MODE="0666"` so the panel service can open it at boot without the user being
+# in `dialout` and without a logind session (uaccess ACLs need an active seat).
+# It is a display, not a security boundary. `70-` sorts before 73-seat-late so
+# the `uaccess` tag also works for interactive use. `SYMLINK` gives a stable node.
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="5722", MODE="0666", TAG+="uaccess", SYMLINK+="turzx-panel"

@@ -109,6 +109,7 @@ dependencies = [
  "renderer",
  "serde",
  "toml",
+ "toml_edit",
  "turzx",
 ]
 

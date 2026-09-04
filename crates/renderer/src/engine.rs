@@ -72,7 +72,7 @@ impl SceneEngine {
         }
     }
 
-    /// Decode image PNGs and parse `path` layers once, up front.
+    /// Decode image assets (PNG or JPEG) and parse `path` layers once, up front.
     #[allow(clippy::map_entry)] // the inserts are fallible; `entry` would be worse
     pub fn load_assets(&mut self, scene: &SceneFile, base: &FsPath) -> anyhow::Result<()> {
         for layer in &scene.layers {
@@ -83,7 +83,7 @@ impl SceneEngine {
                             let p = base.join(src);
                             let bytes = std::fs::read(&p)
                                 .with_context(|| format!("reading image {}", p.display()))?;
-                            let pm = Pixmap::decode_png(&bytes)
+                            let pm = decode_image_bytes(&bytes)
                                 .with_context(|| format!("decoding {}", p.display()))?;
                             self.images.insert(src.clone(), pm);
                         }
@@ -112,6 +112,40 @@ impl SceneEngine {
                 _ => {}
             }
         }
+        Ok(())
+    }
+
+    /// Forget the previous frame so the next `render` reports a full-screen
+    /// dirty rect. Call this when switching which scene an engine drives.
+    pub fn reset(&mut self) {
+        self.prev.clear();
+    }
+
+    /// Replace (or add) an `image` layer's bitmap at runtime, keyed by the
+    /// same `source` string the scene's `[[layer]]` uses — e.g. to swap a
+    /// static placeholder for art fetched at runtime (a game's cover, an
+    /// avatar). Accepts anything `image` can decode (PNG, JPEG, ...).
+    ///
+    /// The image layer blits its pixmap at native size × `scale` (see
+    /// `load_assets`), so a runtime image of arbitrary resolution/aspect
+    /// would otherwise blow past the box the scene was laid out around. To
+    /// keep the swap layout-safe this cover-fits (scale-to-fill + centre
+    /// crop) to whatever pixmap already occupies `key` — normally the
+    /// scene's own placeholder asset, loaded by `load_assets`.
+    ///
+    /// Call [`Self::reset`] afterwards so the swap repaints.
+    pub fn set_image(&mut self, key: &str, path: &FsPath) -> anyhow::Result<()> {
+        let bytes =
+            std::fs::read(path).with_context(|| format!("reading image {}", path.display()))?;
+        let img = image::load_from_memory(&bytes)
+            .with_context(|| format!("decoding {}", path.display()))?
+            .to_rgba8();
+        let target = self.images.get(key).map(|pm| (pm.width(), pm.height()));
+        let pm = match target {
+            Some((tw, th)) if tw > 0 && th > 0 => cover_fit(&img, tw, th),
+            _ => rgba_to_pixmap(&img),
+        };
+        self.images.insert(key.to_string(), pm);
         Ok(())
     }
 
@@ -196,7 +230,18 @@ impl SceneEngine {
         }
 
         let raw = l.value.as_deref().unwrap_or("");
-        let text = ctx.expand(raw);
+        let mut text = ctx.expand(raw);
+        // Bitmap text (5x7, 6px advance) is clipped to the canvas otherwise —
+        // truncate with `...` to fit `max_width`.
+        if bitmap_text {
+            if let Some(mw) = l.max_width {
+                let per_char = 6.0 * scale.max(0.01);
+                let fits = (mw / per_char).floor().max(0.0) as usize;
+                if fits >= 4 && text.chars().count() > fits {
+                    text = text.chars().take(fits - 3).collect::<String>() + "...";
+                }
+            }
+        }
         let progress = anim_value
             .or_else(|| ctx.expand_f32(if raw.is_empty() { "0" } else { raw }))
             .unwrap_or(0.0);
@@ -285,6 +330,13 @@ impl SceneEngine {
                 if let Some(s) = &r.stroke {
                     let p = s.to_paint(grads, bbox, r.opacity * r.stroke_opacity, blend);
                     canvas.stroke_rect(r.x, r.y, r.w, r.h, r.stroke_width, &p);
+                }
+            }
+            LayerKind::StrokeRect => {
+                // Border only. Paint from `stroke`, else `fill`/`color`.
+                if let Some(spec) = r.stroke.as_ref().or(r.fill.as_ref()) {
+                    let p = spec.to_paint(grads, bbox, r.opacity, blend);
+                    canvas.stroke_rect(r.x, r.y, r.w, r.h, r.stroke_width.max(1.0), &p);
                 }
             }
             LayerKind::Scanlines => {
@@ -473,6 +525,48 @@ impl SceneEngine {
         let y = r.y.min(self.height);
         Rect::new(x, y, r.w.min(self.width - x), r.h.min(self.height - y))
     }
+}
+
+/// Decode any format `image` supports (PNG, JPEG, ...) into a `tiny_skia`
+/// pixmap (premultiplied RGBA8, as `Pixmap` requires).
+fn decode_image_bytes(bytes: &[u8]) -> anyhow::Result<Pixmap> {
+    let img = image::load_from_memory(bytes).context("unrecognized image format")?;
+    Ok(rgba_to_pixmap(&img.to_rgba8()))
+}
+
+/// `image::RgbaImage` -> `tiny_skia::Pixmap`, premultiplying alpha as
+/// `Pixmap` requires. Falls back to a 1x1 transparent pixmap on a zero-size
+/// image (never panics on attacker/game-provided art).
+fn rgba_to_pixmap(img: &image::RgbaImage) -> Pixmap {
+    let (w, h) = img.dimensions();
+    let Some(mut pm) = Pixmap::new(w.max(1), h.max(1)) else {
+        return Pixmap::new(1, 1).unwrap();
+    };
+    for (dst, src) in pm.pixels_mut().iter_mut().zip(img.pixels()) {
+        let [r, g, b, a] = src.0;
+        *dst = tiny_skia::ColorU8::from_rgba(r, g, b, a).premultiply();
+    }
+    pm
+}
+
+/// Scale `img` up just enough to cover a `tw`x`th` box, then centre-crop to
+/// it exactly — like CSS `object-fit: cover`. Used so art of arbitrary
+/// resolution/aspect (a fetched game cover) fills the same footprint a
+/// scene's placeholder image occupied, instead of blitting at native size.
+fn cover_fit(img: &image::RgbaImage, tw: u32, th: u32) -> Pixmap {
+    let (sw, sh) = img.dimensions();
+    if sw == 0 || sh == 0 {
+        return rgba_to_pixmap(img);
+    }
+    let scale = (tw as f32 / sw as f32).max(th as f32 / sh as f32);
+    let (nw, nh) = (
+        (sw as f32 * scale).round().max(1.0) as u32,
+        (sh as f32 * scale).round().max(1.0) as u32,
+    );
+    let resized = image::imageops::resize(img, nw, nh, image::imageops::FilterType::Triangle);
+    let (x, y) = ((nw.saturating_sub(tw)) / 2, (nh.saturating_sub(th)) / 2);
+    let cropped = image::imageops::crop_imm(&resized, x, y, tw.min(nw), th.min(nh)).to_image();
+    rgba_to_pixmap(&cropped)
 }
 
 fn flat_of(spec: &PaintSpec) -> Rgba {

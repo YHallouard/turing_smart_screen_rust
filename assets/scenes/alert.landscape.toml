@@ -1,0 +1,142 @@
+# Horus I — alerte matérielle, paysage (480x320). Scène paramétrique : le daemon
+# remplit les `{{ alert.* }}` selon l'alerte active. Voir alert.portrait.toml.
+
+[scene]
+name = "alert"
+duration = 8.0
+background = "#05060a"
+orientation = "landscape"
+
+[[layer]]
+type = "stroke_rect"
+x = 0
+y = 0
+width = 480
+height = 320
+stroke_width = 3
+color = "#ff5b4a"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }]
+easing = "linear"
+
+[[layer]]
+type = "rect"
+x = 0
+y = 98
+width = 480
+height = 124
+color = "#14060a"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }]
+easing = "linear"
+
+[[layer]]
+type = "rect"
+x = 0
+y = 98
+width = 480
+height = 3
+color = "#ff5b4a"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }]
+easing = "linear"
+
+[[layer]]
+type = "rect"
+x = 0
+y = 221
+width = 480
+height = 1
+color = "#ff5b4a"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 0.5 }]
+easing = "linear"
+
+[[layer]]
+type = "text"
+value = "{{ alert.title }}"
+x = 42
+y = 116
+scale = 2
+color = "#ff5b4a"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }]
+easing = "linear"
+
+[[layer]]
+type = "text"
+value = "{{ alert.label }}"
+x = 42
+y = 142
+scale = 2
+color = "#a8564a"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }]
+easing = "linear"
+
+[[layer]]
+type = "text"
+value = "{{ alert.value }}"
+x = 42
+y = 160
+scale = 6
+color = "#ff5b4a"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }]
+easing = "linear"
+
+[[layer]]
+type = "text"
+value = "{{ alert.threshold }}"
+x = 260
+y = 142
+scale = 2
+color = "#a8564a"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }]
+easing = "linear"
+
+[[layer]]
+type = "progress_bar"
+value = "{{ alert.frac }}"
+x = 260
+y = 166
+width = 178
+height = 6
+color = "#ff5b4a"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }]
+easing = "linear"
+
+[[layer]]
+type = "text"
+value = "{{ alert.action }}"
+x = 260
+y = 190
+scale = 2
+color = "#ffb340"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }]
+easing = "linear"
+
+[[layer]]
+type = "text"
+value = "HORUS I"
+x = 356
+y = 250
+scale = 2
+color = "#4a2b26"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.03, v = 1 }]
+easing = "linear"

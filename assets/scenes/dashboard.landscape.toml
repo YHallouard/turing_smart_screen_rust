@@ -1,0 +1,144 @@
+# GPU/CPU/VRAM/FPS dashboard — landscape (480x320). Steady state after the boot
+# scene. Two columns. Static layout; the daemon re-renders it ~1x/s with fresh
+# sensor values in the `{{ ... }}` slots.
+
+[scene]
+name = "dashboard"
+duration = 1.0
+background = "#05060a"
+orientation = "landscape"
+
+# header rule
+[[layer]]
+type = "rect"
+x = 42
+y = 69
+width = 396
+height = 1
+color = "#8a6f37"
+
+# --- GPU (left col) ---
+[[layer]]
+type = "text"
+value = "GPU"
+x = 42
+y = 81
+scale = 2
+color = "#8a6f37"
+[[layer]]
+type = "text"
+value = "{{ gpu.pct }}"
+x = 172
+y = 81
+scale = 2
+color = "#eece86"
+[[layer]]
+type = "progress_bar"
+value = "{{ gpu.frac }}"
+x = 42
+y = 98
+width = 178
+height = 4
+color = "#c9a24b"
+
+# --- CPU (right col) ---
+[[layer]]
+type = "text"
+value = "CPU"
+x = 252
+y = 81
+scale = 2
+color = "#8a6f37"
+[[layer]]
+type = "text"
+value = "{{ cpu.pct }}"
+x = 382
+y = 81
+scale = 2
+color = "#eece86"
+[[layer]]
+type = "progress_bar"
+value = "{{ cpu.frac }}"
+x = 252
+y = 98
+width = 178
+height = 4
+color = "#c9a24b"
+
+# --- VRAM (left col) ---
+[[layer]]
+type = "text"
+value = "VRAM"
+x = 42
+y = 159
+scale = 2
+color = "#8a6f37"
+[[layer]]
+type = "text"
+value = "{{ vram }}"
+x = 148
+y = 159
+scale = 2
+color = "#eece86"
+[[layer]]
+type = "progress_bar"
+value = "{{ vram.frac }}"
+x = 42
+y = 176
+width = 178
+height = 4
+color = "#c9a24b"
+
+# --- FPS (right col) ---
+[[layer]]
+type = "text"
+value = "FPS"
+x = 252
+y = 159
+scale = 2
+color = "#8a6f37"
+[[layer]]
+type = "text"
+value = "{{ fps }}"
+x = 394
+y = 159
+scale = 2
+color = "#eece86"
+[[layer]]
+type = "progress_bar"
+value = "{{ fps.frac }}"
+x = 252
+y = 176
+width = 178
+height = 4
+color = "#c9a24b"
+
+# --- Temperatures (text only, no bar) ---
+[[layer]]
+type = "text"
+value = "GPU TEMP"
+x = 42
+y = 237
+scale = 2
+color = "#8a6f37"
+[[layer]]
+type = "text"
+value = "{{ gpu.temp }}"
+x = 160
+y = 237
+scale = 2
+color = "#eece86"
+[[layer]]
+type = "text"
+value = "CPU TEMP"
+x = 252
+y = 237
+scale = 2
+color = "#8a6f37"
+[[layer]]
+type = "text"
+value = "{{ cpu.temp }}"
+x = 370
+y = 237
+scale = 2
+color = "#eece86"

@@ -1,0 +1,95 @@
+# Horus I — panneau "lancement de jeu", paysage (480x320). Version simple :
+# le jeu + une stat, fondu / hold / fondu. Voir launch.portrait.toml.
+# ASSET : assets/launch/cover.png (160x160 RGBA), blitté 1:1 ici.
+
+[scene]
+name = "launch_game"
+duration = 10
+background = "#05060a"
+orientation = "landscape"
+
+[[layer]]
+type = "rect"
+x = 40
+y = 66
+width = 400
+height = 2
+color = "#eece86"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.4, v = 0 }, { t = 0.9, v = 1 }, { t = 9.9, v = 1 }, { t = 9.95, v = 0 }]
+easing = "ease_out"
+
+[[layer]]
+type = "text"
+value = "LANCEMENT"
+x = 232
+y = 84
+scale = 2
+color = "#8a6f37"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.4, v = 0 }, { t = 0.9, v = 1 }, { t = 9.9, v = 1 }, { t = 9.95, v = 0 }]
+easing = "ease_out"
+
+[[layer]]
+type = "image"
+source = "../launch/cover.png"
+x = 40
+y = 96
+width = 160
+height = 160
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.4, v = 0 }, { t = 0.9, v = 1 }, { t = 9.9, v = 1 }, { t = 9.95, v = 0 }]
+easing = "ease_out"
+
+[[layer]]
+type = "text"
+value = "{{ game.name }}"
+x = 232
+y = 128
+scale = 4
+max_width = 244
+color = "#eece86"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.4, v = 0 }, { t = 0.9, v = 1 }, { t = 9.9, v = 1 }, { t = 9.95, v = 0 }]
+easing = "ease_out"
+
+[[layer]]
+type = "text"
+value = "{{ game.subtitle }}"
+x = 232
+y = 172
+scale = 2
+color = "#c9a24b"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.4, v = 0 }, { t = 0.9, v = 1 }, { t = 9.9, v = 1 }, { t = 9.95, v = 0 }]
+easing = "ease_out"
+
+[[layer]]
+type = "progress_bar"
+value = "{{ game.stat_frac }}"
+x = 232
+y = 200
+width = 208
+height = 6
+color = "#c9a24b"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.4, v = 0 }, { t = 0.9, v = 1 }, { t = 9.9, v = 1 }, { t = 9.95, v = 0 }]
+easing = "ease_out"
+
+[[layer]]
+type = "text"
+value = "HORUS I"
+x = 232
+y = 268
+scale = 2
+color = "#2e2717"
+[[layer.anim]]
+property = "opacity"
+keys = [{ t = 0, v = 0 }, { t = 0.4, v = 0 }, { t = 0.9, v = 1 }, { t = 9.9, v = 1 }, { t = 9.95, v = 0 }]
+easing = "ease_out"

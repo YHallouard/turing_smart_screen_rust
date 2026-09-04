@@ -1,0 +1,24 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    remove | purge)
+        # Stop it in the removing user's session if we can.
+        if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != root ] && command -v loginctl >/dev/null 2>&1; then
+            uid="$(id -u "$SUDO_USER" 2>/dev/null || true)"
+            if [ -n "$uid" ] && [ -d "/run/user/$uid" ]; then
+                sudo -u "$SUDO_USER" XDG_RUNTIME_DIR="/run/user/$uid" \
+                    systemctl --user disable --now bc250-dashboard.service 2>/dev/null || true
+            fi
+        fi
+        if command -v deb-systemd-helper >/dev/null 2>&1; then
+            [ "$1" = purge ] && deb-systemd-helper --user purge bc250-dashboard.service >/dev/null 2>&1 || true
+            deb-systemd-helper --user disable bc250-dashboard.service >/dev/null 2>&1 || true
+        else
+            systemctl --global disable bc250-dashboard.service >/dev/null 2>&1 || true
+        fi
+        udevadm control --reload-rules 2>/dev/null || true
+        ;;
+esac
+
+exit 0

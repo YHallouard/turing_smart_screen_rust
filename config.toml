@@ -4,4 +4,39 @@
 [panel]
 # "portrait"  -> 320x480 logical canvas, sent to the panel 1:1
 # "landscape" -> 480x320 logical canvas, mapped onto the physical array
-orientation = "portrait"
+orientation = "landscape"
+
+[sensors]
+# GPU source: "auto" (nvidia-smi if present, else AMD sysfs) | "amd" | "nvidia".
+# On this box "auto" picks the RTX 4070; "amd" is the BC-250 APU (2 GiB UMA
+# VRAM, the rest is GTT).
+gpu = "auto"
+# In-game FPS is read from MangoHud's CSV log. Enable continuous logging in
+# ~/.config/MangoHud/MangoHud.conf with:  autostart_log=1  and  log_interval=2000
+# `output_folder=` is auto-read from that file; override it here if needed:
+# mangohud_log_dir = "/home/yannhallouard/.local/share/MangoHud/logs"
+fps_stale_secs       = 10.0   # FPS log older than this = "no game" -> shows "-"
+fps_bar_max          = 60.0   # FPS that fills the dashboard bar
+mangohud_prune_hours = 24.0   # daemon deletes MangoHud CSVs older than this (0 = keep)
+
+[alerts]
+# A reading past its trigger takes over the panel with the full-screen alert
+# scene until it drops back past the matching *_clear threshold (hysteresis)
+# and min_secs has elapsed. Precedence: fan-stopped > GPU temp > VRAM.
+enabled          = true
+gpu_temp_c       = 85     # trigger, °C   (0 disables)
+gpu_temp_clear_c = 80     # clear
+vram_frac        = 0.95   # trigger, used/total   (0 disables)
+vram_frac_clear  = 0.90
+fan_min_rpm      = 400    # trigger: a fan below this RPM   (0 disables; needs a fan tach)
+fan_clear_rpm    = 600
+min_secs         = 4.0    # min time on an alert before the dashboard can return
+
+[steam]
+# Detect the running Steam game (via /proc), play a launch card when it starts,
+# and pop notify.achievement on an unlock — read straight from
+# ~/.steam/.../appcache/stats/*.bin. No Steamworks link, no Web API key.
+enabled          = true
+achievement_secs = 7.9           # how long the achievement popup stays up
+launch_animation = true          # play launch.<orientation>.toml when a game starts
+launch_stat      = "achievements"  # the one stat on the launch card: "achievements" | "none"
