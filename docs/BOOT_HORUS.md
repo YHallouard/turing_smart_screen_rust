@@ -1,58 +1,107 @@
-# Boot Horus I — implementation notes
+# Boot + dashboard — minimal-motion scenes
 
-Port of the Claude Design project *"Animation de boot Horus I"*
-(`Boot Horus I.dc.html` → `boot-horus.jsx`) into `crates/renderer`.
+Re-authored (from the Claude Design canvas *Boot Horus Minimal*) for the real
+TURZX 3.5" **revision A** panel, which repaints a full 320×480 screen in
+~0.5–1 s. The old 10 s stroke-traced boot is in git history (commit `99670e5`).
 
-## Choreography
+Two scenes, played back to back by the daemon in its default `--mode sequence`:
 
-10 s, 30 fps, authored natively per orientation (never rotated). The design's
-cue table (`OM_SCENES` + per-section `nat`) resolves to **absolute** seconds,
-which is what the TOML keyframes use directly:
+| Scene | Files | Role |
+|---|---|---|
+| **boot** | `assets/scenes/boot.{portrait,landscape}.toml` | seal + name, ~3 s, then the daemon hard-cuts away |
+| **dashboard** | `assets/scenes/dashboard.{portrait,landscape}.toml` | steady state, re-rendered ~1×/s from live sensors, held forever |
 
-| Cue | t (s) | Beat |
-|-----|-------|------|
-| Power | 0.0 | panel wakes: white flash, gold sweep, frame + rings trace in |
-| Trace | 1.4 | the eye is drawn stroke-by-stroke in gold |
-| Ignite | 4.8 | the outline fills with the gold gradient; warm flash; rings lock |
-| Wordmark | 6.4 | `HORUS I` appears letter by letter, then `GAMIN CORP` |
-| Handoff | 8.2 | seal shrinks to a top badge; GPU/CPU/VRAM/FPS dashboard rises |
-| end | 10.0 | fade to `#05060a` (loop reset) |
+Design rules, both scenes: **constant layer set**, **only `opacity` and
+progress-bar `value` animate** (no `x`/`y`/`scale`/`rotation`), **no glow, no
+per-letter reveal, no full-screen layer, static background**. The single
+unavoidable full-screen frame is the boot→dashboard scene switch.
 
-Layouts (`LAYOUTS.portrait` / `LAYOUTS.landscape`) map 1:1 to the two scene
-files. Portrait stacks (eye centred, wordmark low, 1-column dashboard); landscape
-is left/right (eye left, wordmark right left-aligned, 2-column dashboard).
+## boot
 
-## Engine primitives added (was `BOOT_PRIMITIVES.md` in the design project)
+| t (s) | Beat | Layers changing |
+|---|---|---|
+| 0.0 | Seal drawn — frame-1 baseline (~1 s on hardware) | — |
+| 0.6–1.2 | `HORUS I` fades in (`opacity`) | 1 |
+| 1.2–1.8 | `GAMIN CORP` fades in | 1 |
+| 1.8–3.0 | Hold | 0 |
+| 3.0 | Daemon loads the dashboard scene → one full repaint | — |
 
-| § | Feature | Where |
-|---|---------|-------|
-| 1 | multi-keyframe `Anim` (`keys = [{t,v}]`) + `ease_out_cubic` / `ease_in_out_quad` / `ease_out_back` / `ease_out_quad` | `anim.rs` |
-| 2 | `path` layer: SVG `d` subset parser → `tiny_skia::Path`, `trace` via dashed stroke, `path_length` | `path.rs`, `engine.rs` |
-| 3 | `[[gradient]]` (linear/radial, `axis`) → `tiny_skia` shader for fills, CPU sampler for glyphs | `paint.rs` |
-| 4 | `circle` layer: outline, `trace`, `rotation`, `radius * scale` | `engine.rs`, `framebuffer.rs` |
-| 5 | per-layer transform: `scale` / `rotation` / `anchor` on `path` / `image` / `text` | `engine.rs` |
-| 6 | `glow` (separable box blur, additive composite) and `blend = "add"` | `framebuffer.rs`, `engine.rs` |
-| 7 | TTF text via `fontdue` (Cinzel / Rajdhani / JetBrains Mono), `letter_spacing`, `align`, per-letter reveal from `trace` | `font.rs`, `engine.rs` |
-| 8 | `scanlines` layer | `framebuffer.rs` |
+The seal is `assets/logo/horus-seal-240.png` in an `image` layer. **The engine
+blits images at native size × `scale` and ignores `width`/`height`**, so the
+layer sets `scale = 190/240` (portrait) / `170/240` (landscape) to land the seal
+in the design's box.
 
-Rasterisation is `tiny-skia` (pure Rust). Dirty bboxes inflate by the glow radius
-and, for rotated layers, to the circumscribed square.
+## dashboard
 
-## Known simplifications vs the reference
+Static layout: header rule, `GPU`/`CPU`/`VRAM`/`FPS` rows (label + value +
+progress bar) and `GPU TEMP`/`CPU TEMP` (text only). Values are `{{ … }}` slots
+the daemon fills each poll:
 
-- The ring "lock" overshoot (`easeOutBack` 1.07→1.0 at Ignite) is folded into the
-  handoff `scale` keyframes with `ease_out_cubic` — no visible pre-Ignite bump.
-- `breathe` (±1.6 % sine on the eye) is dropped.
-- Stroke width tracks `1/scale` (constant screen width) rather than the design's
-  `1/ratio` (which thickens as the seal shrinks).
-- The tweak panel (palette / glow / scanlines toggles) is design-time only; the
-  scene bakes the warm-gold palette.
+| slot | source | slot | source |
+|---|---|---|---|
+| `gpu.pct` `gpu.frac` `gpu.temp` `vram*` | GPU source (below) | `cpu.pct` `cpu.frac` | `/proc/stat` delta |
+| `cpu.temp` | `k10temp` / `coretemp` hwmon | `fps` `fps.frac` | MangoHud CSV log |
 
-## Preview
+Every source is best-effort; a missing one renders a dash. Values are
+space-padded to a fixed width by the daemon (`daemon/src/sensors.rs`) because the
+5×7 bitmap font has no `align`.
+
+### GPU source — `config.toml [sensors] gpu`
+
+- **`amd`** — the first DRM card with `gpu_busy_percent` (the BC-250 APU on the
+  target hardware). That counter is bimodal 0/~100 noise, so it is averaged over
+  24 back-to-back reads then EMA-smoothed. VRAM is `mem_info_vram_{used,total}`
+  — on the BC-250 that is the 2 GiB BIOS UMA carve-out (the other ~30 GiB is
+  GTT); temp is the amdgpu hwmon `edge`.
+- **`nvidia`** — one `nvidia-smi --query-gpu=utilization.gpu,memory.used,
+  memory.total,temperature.gpu` per poll (~15 ms). Already smooth.
+- **`auto`** (default) — `nvidia` if `nvidia-smi` works, else `amd`. On a real
+  BC-250 that is `amd`; on a desktop with a discrete NVIDIA card it is `nvidia`.
+
+### FPS via MangoHud
+
+There is no passive FPS source on Linux, so the daemon tails the newest `*.csv`
+in MangoHud's `output_folder` (auto-read from `~/.config/MangoHud/MangoHud.conf`,
+overridable via `config.toml [sensors] mangohud_log_dir`). It takes the last
+row's first column and shows `-` when the newest log is older than
+`fps_stale_secs` (no game running).
+
+To get a live figure, MangoHud must log continuously. Add to
+`~/.config/MangoHud/MangoHud.conf`:
+
+```
+autostart_log=1
+log_interval=1000
+output_folder=/home/you
+```
+
+and run games through it — `mangohud %command%` in the Steam launch options, or
+`MANGOHUD=1` globally.
+
+## Measured dirty pixels (`--backend png --capture --fps 30`)
+
+| Window | Portrait | Landscape |
+|---|---|---|
+| seal / hold | 0 | 0 |
+| `HORUS I` fade | ~830 / frame | ~830 / frame |
+| `GAMIN CORP` fade | ~580 / frame | ~580 / frame |
+| dashboard, one value changes | < 4 000 | < 4 000 |
+| dashboard, nothing changed | 0 | 0 |
+
+Old scene: 307 200 changed px on **every** frame.
+
+## Run
 
 ```sh
-cargo run -p bc250-dashboard -- --backend png --capture --fps 30 \
-  --scene assets/scenes/boot.portrait.toml --out target/hp
-cargo run -p bc250-dashboard -- --backend png --capture --fps 30 --orientation landscape \
-  --scene assets/scenes/boot.landscape.toml --out target/hl
+cargo test --workspace            # ok — 22 tests
+cargo run -p bc250-dashboard -- --backend png --capture --fps 30 --mode single \
+  --orientation portrait  --scene assets/scenes/boot.toml --out target/bp
+cargo run -p bc250-dashboard -- --backend png --capture --fps 30 --mode single \
+  --orientation landscape --scene assets/scenes/boot.toml --out target/bl
+```
+
+On the panel — boot, then the live dashboard, held until Ctrl-C:
+
+```sh
+cargo run -p bc250-dashboard --features serial -- --backend serial --port /dev/ttyACM0
 ```
