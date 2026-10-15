@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Install BC-250 Dashboard
+Comment=Install or repair the TURZX USB screen dashboard (updates are automatic)
+Icon=utilities-terminal
+Terminal=true
+Exec=bash -c "curl -fsSL https://github.com/YHallouard/turing_smart_screen_rust/releases/latest/download/install.sh -o /tmp/bc250-install.sh && bash /tmp/bc250-install.sh; echo; read -rp 'Press Enter to close'"

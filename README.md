@@ -45,6 +45,34 @@ Fonts (Cinzel, Rajdhani, JetBrains Mono — all SIL OFL) are vendored under
 
 ## Install
 
+### SteamOS / Steam Machine (prebuilt, auto-updating)
+
+In **Desktop Mode**, open Konsole and paste:
+
+```sh
+curl -fsSL https://github.com/YHallouard/turing_smart_screen_rust/releases/latest/download/install.sh -o /tmp/bc250-install.sh && bash /tmp/bc250-install.sh
+```
+
+(or download `install-bc250.desktop` from the latest release, mark it
+executable / "trusted", and double-click it). It asks for the sudo password
+once — and lets you set one, since SteamOS ships `deck` without — to install
+the udev rule. Then reboot back into Gaming Mode: the panel starts at every boot.
+
+- **Updates are automatic**: `bc250-update.timer` checks GitHub Releases 3 min
+  after boot and every 12 h, verifies the SHA-256, swaps the binary and assets
+  in place and restarts the panel. Force a check: `bc250-dashboard-update`.
+  Your `~/.config/bc250-dashboard/config.toml` is never overwritten.
+- **Survives SteamOS updates**: everything lives in `/home` (`~/.local`,
+  `~/.config`). Only the udev rule is in `/etc`; if a major SteamOS update ever
+  resets it, the update log says so — re-run the installer once.
+- Logs: `journalctl --user -u bc250-dashboard -f` /
+  `journalctl --user -u bc250-update`.
+
+**Publishing an update** (maintainer): bump `version` in `daemon/Cargo.toml`,
+then `git tag vX.Y.Z && git push --tags`. `.github/workflows/release.yml`
+builds (x86-64-v3), packages (`packaging/steamos/package.sh`) and publishes the
+release; installed consoles pick it up on their next check.
+
 ### `.deb` (Debian / Ubuntu / Pop!_OS)
 
 ```sh
@@ -70,8 +98,9 @@ bc250-dashboard`.
 > Already ran `make install` (below) once? Its unit in `~/.config/systemd/user/`
 > shadows the packaged one — run `make uninstall` before the first `apt install`.
 
-> Bazzite / SteamOS are rpm/ostree — `apt` isn't available there; use
-> `make install` below (writes only to `~/.local` + one udev rule).
+> Bazzite / SteamOS are rpm/ostree — `apt` isn't available there; use the
+> SteamOS installer above, or `make install` below (writes only to `~/.local`
+> + one udev rule).
 
 ### From a checkout (no packaging)
 

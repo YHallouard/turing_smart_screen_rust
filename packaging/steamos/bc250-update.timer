@@ -1,0 +1,11 @@
+[Unit]
+Description=Check for bc250-dashboard updates
+
+[Timer]
+# A few minutes after boot (network up, game not yet launched), then twice a day.
+OnBootSec=3min
+OnUnitActiveSec=12h
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

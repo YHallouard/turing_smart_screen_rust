@@ -1,0 +1,44 @@
+# Push a tag `vX.Y.Z` -> build -> GitHub Release. Installed consoles pick it up
+# automatically through bc250-update.timer (within ~12 h, or on next boot).
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # Oldest supported runner = oldest glibc we link against; SteamOS is newer.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: System deps (serialport -> libudev)
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev pkg-config
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check tag matches daemon version
+        run: |
+          crate=$(sed -n 's/^version = "\(.*\)"/\1/p' daemon/Cargo.toml | head -1)
+          [ "v$crate" = "$GITHUB_REF_NAME" ] || {
+            echo "::error::tag $GITHUB_REF_NAME != daemon/Cargo.toml version $crate"; exit 1; }
+
+      - name: Build
+        # x86-64-v3 (AVX2): every Zen 2+ / Haswell+ CPU, incl. BC-250 and Steam Machine.
+        env:
+          RUSTFLAGS: "-C target-cpu=x86-64-v3"
+        run: make release
+
+      - name: Package
+        run: sh packaging/steamos/package.sh "$GITHUB_REF_NAME" dist-release
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist-release/* --title "$GITHUB_REF_NAME" --generate-notes

@@ -1,0 +1,10 @@
+# Checks GitHub for a newer bc250-dashboard release and installs it.
+# Triggered by bc250-update.timer; run by hand: systemctl --user start bc250-update
+[Unit]
+Description=bc250-dashboard automatic update
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/bc250-dashboard-update
+Nice=19
+IOSchedulingClass=idle
