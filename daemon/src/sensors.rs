@@ -53,6 +53,8 @@ pub struct Sensors {
     cpu_temp: Option<PathBuf>,
     prev_cpu: Option<(u64, u64)>, // (idle, total) jiffies
     fan_inputs: Vec<PathBuf>,
+    /// Parallel to `fan_inputs`: has this tach ever read > 0?
+    fan_seen_spinning: Vec<bool>,
     mangohud_dir: Option<PathBuf>,
     fps_stale: Duration,
     /// Delete MangoHud CSVs older than this (keeping the newest). `None` = keep.
@@ -104,6 +106,7 @@ impl Sensors {
         Self {
             gpu,
             gpu_ema: None,
+            fan_seen_spinning: vec![false; fan_inputs.len()],
             fan_inputs,
             cpu_temp,
             prev_cpu: None,
@@ -160,12 +163,32 @@ impl Sensors {
             vram_used,
             vram_total,
             fps: self.mangohud_fps(),
-            fan_rpm: self
-                .fan_inputs
-                .iter()
-                .filter_map(|p| read_parse::<u32>(Some(p)))
-                .min(),
+            fan_rpm: self.fan_rpm(),
         }
+    }
+
+    /// Lowest RPM among the fans that have ever been seen spinning. Boards
+    /// expose tachs for headers with nothing plugged in; those read 0 forever
+    /// and must not count as a "stopped fan". A fan only counts once it has
+    /// read > 0, so a real stop (spinning, then 0) is still reported.
+    fn fan_rpm(&mut self) -> Option<u32> {
+        let mut lowest: Option<u32> = None;
+        for (path, seen) in self
+            .fan_inputs
+            .iter()
+            .zip(self.fan_seen_spinning.iter_mut())
+        {
+            let Some(rpm) = read_parse::<u32>(Some(path)) else {
+                continue;
+            };
+            if rpm > 0 {
+                *seen = true;
+            }
+            if *seen {
+                lowest = Some(lowest.map_or(rpm, |l| l.min(rpm)));
+            }
+        }
+        lowest
     }
 
     fn cpu_pct(&mut self) -> Option<u32> {
@@ -420,6 +443,10 @@ fn fan_tachs() -> Vec<PathBuf> {
                 out.push(p);
             }
         }
+    }
+    out.sort();
+    for p in &out {
+        log::info!("sensors: fan tach {}", p.display());
     }
     out
 }
