@@ -7,14 +7,17 @@
 //! - GPU: either the AMD render node exposing `gpu_busy_percent` (the BC-250 APU
 //!   on the reference hardware; its `gpu_busy_percent` is bimodal noise, so it
 //!   is burst-averaged and then EMA-smoothed) or, via `nvidia-smi`, an NVIDIA
-//!   card. `[sensors] gpu = "auto" | "amd" | "nvidia"`.
+//!   card. `[sensors] gpu = "auto" | "amd" | "nvidia"`. When
+//!   `gpu_busy_percent` can't be read (EOPNOTSUPP on the BC-250) the load comes
+//!   from the per-process DRM `fdinfo` engine counters instead.
 //! - CPU: `/proc/stat` delta + `k10temp` (or `coretemp`).
 //! - FPS: MangoHud's CSV log, when a game is logging.
 
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use renderer::Context;
 
@@ -52,6 +55,9 @@ pub struct Sensors {
     gpu_ema: Option<f32>,
     cpu_temp: Option<PathBuf>,
     prev_cpu: Option<(u64, u64)>, // (idle, total) jiffies
+    /// GPU load from DRM per-client counters, when `gpu_busy_percent` is
+    /// unusable (the BC-250's amdgpu answers EOPNOTSUPP).
+    fdinfo: Option<DrmFdinfo>,
     fan_inputs: Vec<PathBuf>,
     /// Parallel to `fan_inputs`: has this tach ever read > 0?
     fan_seen_spinning: Vec<bool>,
@@ -103,8 +109,14 @@ impl Sensors {
             mangohud_dir.as_deref(),
         );
 
+        let fdinfo = matches!(gpu, Gpu::Amd { busy: None, .. }).then(DrmFdinfo::new);
+        if fdinfo.is_some() {
+            log::info!("sensors: gpu_busy_percent unusable, GPU load from DRM fdinfo");
+        }
+
         Self {
             gpu,
+            fdinfo,
             gpu_ema: None,
             fan_seen_spinning: vec![false; fan_inputs.len()],
             fan_inputs,
@@ -119,6 +131,7 @@ impl Sensors {
     /// Read every source. CPU % needs two calls to produce a value (it is a
     /// delta); the first call returns `cpu_pct: None`.
     pub fn sample(&mut self) -> Readings {
+        let fdinfo_load = self.fdinfo.as_mut().and_then(DrmFdinfo::sample);
         let (gpu_load, gpu_temp_c, vram_used, vram_total) = match &self.gpu {
             Gpu::Amd {
                 busy,
@@ -126,7 +139,7 @@ impl Sensors {
                 vram_used,
                 vram_total,
             } => (
-                busy.as_deref().and_then(burst_average),
+                busy.as_deref().and_then(burst_average).or(fdinfo_load),
                 read_milli_c(temp.as_deref()),
                 read_parse::<u64>(vram_used.as_deref()),
                 read_parse::<u64>(vram_total.as_deref()),
@@ -270,7 +283,8 @@ fn detect_amd() -> Gpu {
         let vu = dev.join("mem_info_vram_used");
         let vt = dev.join("mem_info_vram_total");
         return Gpu::Amd {
-            busy: Some(busy),
+            // The file can exist yet fail on read (EOPNOTSUPP on the BC-250).
+            busy: fs::read_to_string(&busy).is_ok().then_some(busy),
             temp: first_temp_input(&dev.join("hwmon")),
             vram_used: vu.is_file().then_some(vu),
             vram_total: vt.is_file().then_some(vt),
@@ -281,6 +295,120 @@ fn detect_amd() -> Gpu {
         temp: None,
         vram_used: None,
         vram_total: None,
+    }
+}
+
+/// GPU utilisation from the kernel's per-client DRM counters: every process
+/// with a render node open exposes cumulative engine time in
+/// `/proc/<pid>/fdinfo/<fd>` (`drm-engine-gfx: <ns> ns`, same source as nvtop /
+/// amdgpu_top). Needs no root for our own processes (the games). Load =
+/// delta of busy-ns over wall-ns between two samples.
+struct DrmFdinfo {
+    /// fdinfo files that pointed at `/dev/dri/*` at the last scan.
+    files: Vec<PathBuf>,
+    last_scan: Option<Instant>,
+    /// client id -> cumulative busy ns at the previous sample.
+    prev: HashMap<u64, u64>,
+    prev_at: Option<Instant>,
+}
+
+/// Re-walk `/proc/*/fd` this often; in between only known fdinfo files are read.
+const FDINFO_RESCAN: Duration = Duration::from_secs(10);
+
+impl DrmFdinfo {
+    fn new() -> Self {
+        Self {
+            files: Vec::new(),
+            last_scan: None,
+            prev: HashMap::new(),
+            prev_at: None,
+        }
+    }
+
+    fn scan(&mut self) {
+        self.files.clear();
+        let Ok(procs) = fs::read_dir("/proc") else {
+            return;
+        };
+        for p in procs.flatten() {
+            let name = p.file_name();
+            let Some(pid) = name
+                .to_str()
+                .filter(|n| n.bytes().all(|b| b.is_ascii_digit()))
+            else {
+                continue;
+            };
+            let Ok(fds) = fs::read_dir(p.path().join("fd")) else {
+                continue; // not our process
+            };
+            for fd in fds.flatten() {
+                let is_drm = fs::read_link(fd.path()).is_ok_and(|t| t.starts_with("/dev/dri/"));
+                if is_drm {
+                    self.files.push(PathBuf::from(format!(
+                        "/proc/{pid}/fdinfo/{}",
+                        fd.file_name().to_string_lossy()
+                    )));
+                }
+            }
+        }
+        self.last_scan = Some(Instant::now());
+    }
+
+    /// GPU load in percent since the previous call (`None` on the first one).
+    fn sample(&mut self) -> Option<f32> {
+        let now = Instant::now();
+        if self
+            .last_scan
+            .map_or(true, |t| now.duration_since(t) >= FDINFO_RESCAN)
+        {
+            self.scan();
+        }
+
+        // client id -> busy ns; dedupes fds shared across dup()/fork().
+        let mut cur: HashMap<u64, u64> = HashMap::new();
+        let mut seen = HashSet::new();
+        for f in &self.files {
+            let Ok(text) = fs::read_to_string(f) else {
+                continue;
+            };
+            let mut id = None;
+            let mut busy = 0u64;
+            for line in text.lines() {
+                let Some((k, v)) = line.split_once(':') else {
+                    continue;
+                };
+                let v = v.trim();
+                match k {
+                    "drm-client-id" => id = v.parse::<u64>().ok(),
+                    "drm-engine-gfx" | "drm-engine-compute" => {
+                        busy += v
+                            .split_whitespace()
+                            .next()
+                            .and_then(|n| n.parse().ok())
+                            .unwrap_or(0);
+                    }
+                    _ => {}
+                }
+            }
+            if let Some(id) = id {
+                if seen.insert(id) {
+                    cur.insert(id, busy);
+                }
+            }
+        }
+
+        let load = self.prev_at.map(|t0| {
+            let wall_ns = now.duration_since(t0).as_nanos().max(1) as f64;
+            // Clients that appeared since the last sample have no baseline: skip them.
+            let delta: u64 = cur
+                .iter()
+                .filter_map(|(id, ns)| self.prev.get(id).map(|p| ns.saturating_sub(*p)))
+                .sum();
+            (delta as f64 / wall_ns * 100.0).clamp(0.0, 100.0) as f32
+        });
+        self.prev = cur;
+        self.prev_at = Some(now);
+        load
     }
 }
 
