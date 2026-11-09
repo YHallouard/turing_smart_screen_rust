@@ -6,6 +6,10 @@
 # checksum, and swaps it in under ~/.local (survives SteamOS OS updates).
 #
 #   bc250-dashboard-update            update if a newer release exists
+#   bc250-dashboard-update --check    only report: prints "available vX.Y.Z",
+#                                     "up-to-date vX.Y.Z" or "unknown"; installs
+#                                     nothing (what the timer runs; the Decky
+#                                     plugin / you apply it on demand)
 #   bc250-dashboard-update --force    reinstall the latest release
 #
 # Never touches ~/.config/bc250-dashboard/config.toml once it exists.
@@ -20,7 +24,11 @@ UNIT_DIR="$HOME/.config/systemd/user"
 UDEV_RULE="/etc/udev/rules.d/70-turzx-panel.rules"
 
 FORCE=0
-[ "${1:-}" = "--force" ] && FORCE=1
+CHECK=0
+case "${1:-}" in
+    --force) FORCE=1 ;;
+    --check) CHECK=1 ;;
+esac
 
 log() { echo "bc250-update: $*"; }
 
@@ -33,15 +41,20 @@ flock -n 9 || { log "another update is running, skipping"; exit 0; }
 latest_url=$(curl -fsSLI -o /dev/null -w '%{url_effective}' \
     "https://github.com/$REPO/releases/latest" 2>/dev/null) || {
     log "offline or GitHub unreachable, skipping"
+    [ "$CHECK" -eq 1 ] && echo "unknown"
     exit 0
 }
 tag=${latest_url##*/}
 case "$tag" in
     v*) ;;
-    *) log "no published release yet"; exit 0 ;;
+    *) log "no published release yet"; [ "$CHECK" -eq 1 ] && echo "unknown"; exit 0 ;;
 esac
 
 current=$(cat "$SHARE_DIR/VERSION" 2>/dev/null || echo none)
+if [ "$CHECK" -eq 1 ]; then
+    if [ "$tag" = "$current" ]; then echo "up-to-date $tag"; else echo "available $tag"; fi
+    exit 0
+fi
 if [ "$tag" = "$current" ] && [ "$FORCE" -eq 0 ]; then
     log "up to date ($current)"
     exit 0

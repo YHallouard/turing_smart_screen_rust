@@ -271,10 +271,29 @@ function Content() {
   );
 }
 
-export default definePlugin(() => ({
-  name: "BC-250 Dashboard",
-  titleView: <div>BC-250 Dashboard</div>,
-  content: <Content />,
-  icon: <FaTv />,
-  onDismount() {},
-}));
+// Updates are no longer installed automatically: tell the user once per
+// Steam session when a newer release exists (applied from the panel).
+async function notifyIfUpdate() {
+  try {
+    const [st, lt] = await Promise.all([getStatus(), latestVersion()]);
+    if (st.installed && lt.tag && lt.tag !== st.version) {
+      toaster.toast({
+        title: "BC-250 Dashboard",
+        body: `Mise à jour disponible : ${lt.tag} (menu ... > BC-250 Dashboard)`,
+      });
+    }
+  } catch {
+    /* offline or backend not ready: stay silent */
+  }
+}
+
+export default definePlugin(() => {
+  setTimeout(notifyIfUpdate, 15_000);
+  return {
+    name: "BC-250 Dashboard",
+    titleView: <div>BC-250 Dashboard</div>,
+    content: <Content />,
+    icon: <FaTv />,
+    onDismount() {},
+  };
+});
