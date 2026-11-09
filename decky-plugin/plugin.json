@@ -1,0 +1,13 @@
+{
+  "name": "BC-250 Dashboard",
+  "author": "YHallouard",
+  "flags": [],
+  "api_version": 1,
+  "publish": {
+    "tags": [
+      "hardware",
+      "monitoring"
+    ],
+    "description": "Control panel for the TURZX USB screen dashboard: settings, status and updates."
+  }
+}

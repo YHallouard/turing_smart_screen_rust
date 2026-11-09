@@ -38,6 +38,15 @@ jobs:
       - name: Package
         run: sh packaging/steamos/package.sh "$GITHUB_REF_NAME" dist-release
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: decky-plugin/package-lock.json
+
+      - name: Decky plugin zip
+        run: sh decky-plugin/package.sh "$GITHUB_REF_NAME" dist-release
+
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
