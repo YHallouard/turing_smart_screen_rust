@@ -41,6 +41,10 @@ def _env(u: pwd.struct_passwd) -> dict:
         DBUS_SESSION_BUS_ADDRESS=f"unix:path=/run/user/{u.pw_uid}/bus",
         PATH=f"{u.pw_dir}/.local/bin:" + env.get("PATH", "/usr/bin:/bin"),
     )
+    # Decky's own environment must not redirect the daemon's config / data dirs
+    # (the daemon resolves ~/.config and ~/.local/share from HOME).
+    for k in ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME"):
+        env.pop(k, None)
     env.pop("LD_LIBRARY_PATH", None)  # Steam's runtime libs break system tools
     return env
 
