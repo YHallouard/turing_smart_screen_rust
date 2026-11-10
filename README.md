@@ -58,13 +58,21 @@ executable / "trusted", and double-click it). It asks for the sudo password
 once — and lets you set one, since SteamOS ships `deck` without — to install
 the udev rule. Then reboot back into Gaming Mode: the panel starts at every boot.
 
-- **Updates are automatic**: `bc250-update.timer` checks GitHub Releases 3 min
-  after boot and every 12 h, verifies the SHA-256, swaps the binary and assets
-  in place and restarts the panel. Force a check: `bc250-dashboard-update`.
+- **Updates are on demand**: `bc250-update.timer` only *checks* GitHub Releases
+  (3 min after boot, then every 12 h; `bc250-dashboard-update --check`). Apply
+  from the Decky plugin's *Update* button or with `bc250-dashboard-update`: it
+  verifies the SHA-256, swaps the binary and assets in place and restarts the panel.
   Your `~/.config/bc250-dashboard/config.toml` is never overwritten.
 - **Survives SteamOS updates**: everything lives in `/home` (`~/.local`,
   `~/.config`). Only the udev rule is in `/etc`; if a major SteamOS update ever
   resets it, the update log says so — re-run the installer once.
+- **Decky Loader plugin (Gaming Mode)**: `bc250-dashboard-decky.zip` on the
+  release page. Install via Decky > Settings > Developer > *Install plugin from
+  ZIP*. It adds a quick-access (`...`) panel with service/panel status, a
+  settings form generated from `bc250-dashboard config json`, restart, logs and
+  an *Update* button (runs `bc250-dashboard-update`). The daemon itself stays a
+  systemd user service, so the screen keeps working without Steam / Decky.
+  Source and build notes: `decky-plugin/` (`npm ci && npm run build`).
 - Logs: `journalctl --user -u bc250-dashboard -f` /
   `journalctl --user -u bc250-update`.
 

@@ -5,7 +5,8 @@
 #
 # Idempotent: re-run it any time (e.g. after a SteamOS update reset /etc) to
 # repair the install. Everything lands in /home except the udev rule, the only
-# step that needs sudo. Updates are then automatic (bc250-update.timer).
+# step that needs sudo. Updates are applied on demand (Decky plugin
+# or `bc250-dashboard-update`); bc250-update.timer only checks.
 set -euo pipefail
 
 REPO="YHallouard/turing_smart_screen_rust"
@@ -45,7 +46,7 @@ else
     sudo udevadm trigger --subsystem-match=tty --attr-match=idVendor=1a86
 fi
 
-say "Enabling the dashboard and automatic updates"
+say "Enabling the dashboard and the update check"
 systemctl --user daemon-reload
 systemctl --user enable bc250-dashboard.service bc250-update.timer
 systemctl --user restart bc250-dashboard.service
@@ -54,7 +55,7 @@ systemctl --user start bc250-update.timer
 loginctl enable-linger "$USER" 2>/dev/null || sudo loginctl enable-linger "$USER" || true
 
 say "Done - $(cat "$SHARE_DIR/VERSION")"
-echo "The screen starts on every boot and updates itself."
+echo "The screen starts on every boot. Update from the Decky plugin or: bc250-dashboard-update"
 echo "  logs:    journalctl --user -u bc250-dashboard -f"
 echo "  config:  ~/.config/bc250-dashboard/config.toml"
 if [ ! -e /dev/turzx-panel ]; then

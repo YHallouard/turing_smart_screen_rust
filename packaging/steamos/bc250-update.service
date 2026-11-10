@@ -1,10 +1,11 @@
-# Checks GitHub for a newer bc250-dashboard release and installs it.
+# Checks GitHub for a newer bc250-dashboard release; does NOT install it (apply
+# from the Decky plugin or with: bc250-dashboard-update).
 # Triggered by bc250-update.timer; run by hand: systemctl --user start bc250-update
 [Unit]
-Description=bc250-dashboard automatic update
+Description=bc250-dashboard update check
 
 [Service]
 Type=oneshot
-ExecStart=%h/.local/bin/bc250-dashboard-update
+ExecStart=%h/.local/bin/bc250-dashboard-update --check
 Nice=19
 IOSchedulingClass=idle
