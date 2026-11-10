@@ -5,9 +5,18 @@ name: release
 on:
   push:
     tags: ["v*"]
+  # Manual run: builds the tip of main and creates the tag + release itself.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to create, e.g. v0.1.3"
+        required: true
 
 permissions:
   contents: write
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   release:
@@ -15,6 +24,8 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'main' || github.ref }}
 
       - name: System deps (serialport -> libudev)
         run: sudo apt-get update && sudo apt-get install -y libudev-dev pkg-config
@@ -26,8 +37,8 @@ jobs:
       - name: Check tag matches daemon version
         run: |
           crate=$(sed -n 's/^version = "\(.*\)"/\1/p' daemon/Cargo.toml | head -1)
-          [ "v$crate" = "$GITHUB_REF_NAME" ] || {
-            echo "::error::tag $GITHUB_REF_NAME != daemon/Cargo.toml version $crate"; exit 1; }
+          [ "v$crate" = "$TAG" ] || {
+            echo "::error::tag $TAG != daemon/Cargo.toml version $crate"; exit 1; }
 
       - name: Build
         # x86-64-v3 (AVX2): every Zen 2+ / Haswell+ CPU, incl. BC-250 and Steam Machine.
@@ -36,7 +47,7 @@ jobs:
         run: make release
 
       - name: Package
-        run: sh packaging/steamos/package.sh "$GITHUB_REF_NAME" dist-release
+        run: sh packaging/steamos/package.sh "$TAG" dist-release
 
       - uses: actions/setup-node@v4
         with:
@@ -45,7 +56,7 @@ jobs:
           cache-dependency-path: decky-plugin/package-lock.json
 
       - name: Decky plugin zip
-        run: sh decky-plugin/package.sh "$GITHUB_REF_NAME" dist-release
+        run: sh decky-plugin/package.sh "$TAG" dist-release
 
       - name: Publish
         env:
@@ -53,8 +64,10 @@ jobs:
         # The release may already exist (created from the GitHub web UI, which
         # creates the tag on publish): then just attach/replace the assets.
         run: |
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" dist-release/* --clobber
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist-release/* --clobber
           else
-            gh release create "$GITHUB_REF_NAME" dist-release/* --title "$GITHUB_REF_NAME" --generate-notes
+            # --target creates the tag at this exact commit when it is missing.
+            gh release create "$TAG" dist-release/* --title "$TAG" --generate-notes \
+              --target "$(git rev-parse HEAD)"
           fi

@@ -40,6 +40,9 @@ interface Status {
   state: string;
   enabled: boolean;
   panel: boolean;
+  usb: boolean;
+  udev_rule: boolean;
+  can_repair: boolean;
 }
 
 const getStatus = callable<[], Status>("get_status");
@@ -49,6 +52,19 @@ const restart = callable<[], { ok: boolean; error: string }>("restart");
 const latestVersion = callable<[], { tag: string; error: string }>("latest_version");
 const update = callable<[], { ok: boolean; log: string; version: string }>("update");
 const logs = callable<[number], string>("logs");
+const repairUdev = callable<[], { ok: boolean; error: string }>("repair_udev");
+
+// Logs stay small: a few short lines, never a wall of text.
+const LOG_STYLE: React.CSSProperties = {
+  fontFamily: "monospace",
+  fontSize: 10,
+  lineHeight: 1.3,
+  whiteSpace: "pre-wrap",
+  wordBreak: "break-all",
+  maxHeight: 140,
+  overflowY: "auto",
+  opacity: 0.85,
+};
 
 function Row({ children }: { children: React.ReactNode }) {
   return <PanelSectionRow>{children}</PanelSectionRow>;
@@ -115,7 +131,8 @@ function Content() {
   const [draft, setDraft] = useState<Record<string, Value>>({});
   const [latest, setLatest] = useState("");
   const [busy, setBusy] = useState("");
-  const [log, setLog] = useState("");
+  const [updLog, setUpdLog] = useState("");
+  const [logText, setLogText] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setStatus(await getStatus());
@@ -126,7 +143,24 @@ function Content() {
   useEffect(() => {
     refresh();
     latestVersion().then((r) => setLatest(r.tag));
+    // Keep the state live (service starting, panel plugged in…).
+    const t = setInterval(() => getStatus().then(setStatus), 5000);
+    return () => clearInterval(t);
   }, [refresh]);
+
+  const showLogs = async () => setLogText(await logs(8));
+
+  const doRepair = async () => {
+    setBusy("repair");
+    const r = await repairUdev();
+    toaster.toast({
+      title: "BC-250 Dashboard",
+      body: r.ok ? "Accès à l'écran réparé" : `Échec : ${r.error}`,
+    });
+    if (r.ok) await restart();
+    await refresh();
+    setBusy("");
+  };
 
   const groups = useMemo(() => {
     const m = new Map<string, Setting[]>();
@@ -163,7 +197,7 @@ function Content() {
   const doUpdate = async () => {
     setBusy("update");
     const r = await update();
-    setLog(r.log);
+    setUpdLog(r.log.split("\n").slice(-6).join("\n"));
     toaster.toast({
       title: "BC-250 Dashboard",
       body: r.ok ? `Version ${r.version}` : "Échec de la mise à jour",
@@ -183,12 +217,43 @@ function Content() {
   }
 
   const upToDate = !latest || latest === status?.version;
+  const noPanel = !!status && !status.panel;
+  const serviceLabel = !status
+    ? "…"
+    : status.active
+      ? "actif"
+      : status.state === "activating"
+        ? "en attente de l'écran"
+        : status.state;
 
   return (
     <>
+      {noPanel && (
+        <PanelSection title="⚠ Écran non détecté">
+          <Row>
+            {!status.usb
+              ? "Aucun écran USB détecté. Vérifiez le câble (il doit transmettre des données, pas seulement charger) et le port."
+              : !status.udev_rule
+                ? "Écran présent, mais la règle d'accès (udev) est absente : souvent après une mise à jour de SteamOS."
+                : "Écran présent, mais /dev/turzx-panel est absent."}
+          </Row>
+          {status.usb && status.can_repair && (
+            <Row>
+              <ButtonItem
+                layout="below"
+                disabled={busy !== ""}
+                onClick={doRepair}
+              >
+                {busy === "repair" ? "Réparation…" : "Réparer l'accès à l'écran"}
+              </ButtonItem>
+            </Row>
+          )}
+        </PanelSection>
+      )}
+
       <PanelSection title="État">
         <Row>
-          Service : {status?.active ? "actif" : status?.state ?? "…"}
+          Service : {serviceLabel}
           <br />
           Écran USB : {status?.panel ? "détecté" : "non détecté"}
           <br />
@@ -214,7 +279,11 @@ function Content() {
                 : `Mettre à jour vers ${latest}`}
           </ButtonItem>
         </Row>
-        {log && <Row>{log}</Row>}
+        {updLog && (
+          <Row>
+            <div style={LOG_STYLE}>{updLog}</div>
+          </Row>
+        )}
       </PanelSection>
 
       {cfg?.error && (
@@ -261,11 +330,23 @@ function Content() {
         <Row>
           <ButtonItem
             layout="below"
-            onClick={async () => setLog(await logs(25))}
+            onClick={() => (logText === null ? showLogs() : setLogText(null))}
           >
-            Voir les derniers logs
+            {logText === null ? "Voir les derniers logs" : "Masquer les logs"}
           </ButtonItem>
         </Row>
+        {logText !== null && (
+          <>
+            <Row>
+              <div style={LOG_STYLE}>{logText || "(aucun log)"}</div>
+            </Row>
+            <Row>
+              <ButtonItem layout="below" onClick={showLogs}>
+                Actualiser
+              </ButtonItem>
+            </Row>
+          </>
+        )}
       </PanelSection>
     </>
   );

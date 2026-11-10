@@ -1,7 +1,9 @@
 {
   "name": "BC-250 Dashboard",
   "author": "YHallouard",
-  "flags": [],
+  "flags": [
+    "root"
+  ],
   "api_version": 1,
   "publish": {
     "tags": [
