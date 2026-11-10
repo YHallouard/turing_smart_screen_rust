@@ -163,8 +163,15 @@ fn make_backend(
         BackendKind::Serial => {
             #[cfg(feature = "serial")]
             {
+                // `--port` is the udev symlink (/dev/turzx-panel). If it is missing
+                // (rule lost after an OS update) fall back to finding the panel
+                // by USB id instead of failing.
                 let dev = match &cli.port {
-                    Some(p) => turzx::SerialTurzx::open_path(p)?,
+                    Some(p) if Path::new(p).exists() => turzx::SerialTurzx::open_path(p)?,
+                    Some(p) => {
+                        log::warn!("{p} missing (udev rule?); looking for the panel by USB id");
+                        turzx::SerialTurzx::open()?
+                    }
                     None => turzx::SerialTurzx::open()?,
                 };
                 Ok(Box::new(dev.with_orientation(orientation)))

@@ -43,7 +43,8 @@ else
     # /etc is a writable overlay on SteamOS: no need for steamos-readonly.
     sudo install -Dm644 "$SHARE_DIR/steamos/70-turzx-panel.rules" "$UDEV_RULE"
     sudo udevadm control --reload
-    sudo udevadm trigger --subsystem-match=tty --attr-match=idVendor=1a86
+    # (--attr-match would test the tty node itself, which has no idVendor.)
+    sudo udevadm trigger --action=add --subsystem-match=tty
 fi
 
 say "Enabling the dashboard and the update check"

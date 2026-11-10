@@ -15,7 +15,12 @@ import pwd
 
 import decky
 
+import glob
+import shutil
+
 UNIT = "bc250-dashboard.service"
+UDEV_RULE = "/etc/udev/rules.d/70-turzx-panel.rules"
+VID, PID = "1a86", "5722"
 REPO = "YHallouard/turing_smart_screen_rust"
 
 
@@ -62,6 +67,25 @@ async def _run(*argv: str, timeout: float = 120.0) -> tuple[int, str]:
         return 127, str(e)
 
 
+def _usb_present() -> bool:
+    """Is the panel on the USB bus at all (whatever /dev says)?"""
+    for d in glob.glob("/sys/bus/usb/devices/*"):
+        try:
+            with open(f"{d}/idVendor") as v, open(f"{d}/idProduct") as p:
+                if v.read().strip() == VID and p.read().strip() == PID:
+                    return True
+        except OSError:
+            continue
+    return False
+
+
+def _share_rule() -> str:
+    return os.path.join(
+        _user().pw_dir, ".local", "share", "bc250-dashboard", "steamos",
+        "70-turzx-panel.rules",
+    )
+
+
 def _bin() -> str:
     return os.path.join(_user().pw_dir, ".local", "bin", "bc250-dashboard")
 
@@ -89,6 +113,46 @@ class Plugin:
             "state": active,
             "enabled": enabled == "enabled",
             "panel": os.path.exists("/dev/turzx-panel"),
+            "usb": _usb_present(),
+            "udev_rule": os.path.exists(UDEV_RULE),
+            "can_repair": os.geteuid() == 0,
+        }
+
+    async def repair_udev(self) -> dict:
+        """(Re)install the udev rule and re-apply it to the plugged panel.
+
+        Needs root (plugin.json flag "root"). Used after an OS update wiped
+        /etc, or when /dev/turzx-panel is missing although the panel is on USB.
+        """
+        if os.geteuid() != 0:
+            return {"ok": False, "error": "le plugin ne tourne pas en root"}
+        src = _share_rule()
+        if not os.path.exists(src):
+            return {"ok": False, "error": f"règle introuvable : {src}"}
+        try:
+            os.makedirs(os.path.dirname(UDEV_RULE), exist_ok=True)
+            shutil.copyfile(src, UDEV_RULE)
+            os.chmod(UDEV_RULE, 0o644)
+        except OSError as e:
+            return {"ok": False, "error": str(e)}
+        for cmd in (
+            ["udevadm", "control", "--reload"],
+            ["udevadm", "trigger", "--action=add", "--subsystem-match=tty"],
+            ["udevadm", "settle", "--timeout=5"],
+        ):
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            out, _ = await proc.communicate()
+            if proc.returncode:
+                return {"ok": False, "error": out.decode(errors="replace").strip()}
+        await asyncio.sleep(1)
+        ok = os.path.exists("/dev/turzx-panel")
+        return {
+            "ok": ok,
+            "error": "" if ok else "règle installée mais /dev/turzx-panel absent : rebranchez l'écran",
         }
 
     async def get_config(self) -> dict:
@@ -133,7 +197,7 @@ class Plugin:
         code, out = await _run("bc250-dashboard-update", timeout=300)
         return {"ok": code == 0, "log": out, "version": _installed_version()}
 
-    async def logs(self, lines: int = 40) -> str:
+    async def logs(self, lines: int = 8) -> str:
         _, out = await _run(
             "journalctl", "--user", "-u", UNIT.removesuffix(".service"),
             "-n", str(int(lines)), "--no-pager", "-o", "cat",
