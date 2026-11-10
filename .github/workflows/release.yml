@@ -50,4 +50,11 @@ jobs:
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist-release/* --title "$GITHUB_REF_NAME" --generate-notes
+        # The release may already exist (created from the GitHub web UI, which
+        # creates the tag on publish): then just attach/replace the assets.
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist-release/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist-release/* --title "$GITHUB_REF_NAME" --generate-notes
+          fi
