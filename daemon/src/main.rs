@@ -240,6 +240,16 @@ fn boot_status(progress: f32) -> &'static str {
     STAGES[idx.min(STAGES.len() - 1)]
 }
 
+/// Set by SIGTERM / SIGINT / SIGHUP (`systemctl restart|stop`, Ctrl-C). Every
+/// render loop checks it between frames so a frame already being streamed to
+/// the panel is finished before exit: a process killed mid-bitmap leaves the
+/// panel waiting for pixels and it stays frozen until it is re-plugged.
+static STOP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+fn closing(backend: &dyn DisplayBackend) -> bool {
+    STOP.load(std::sync::atomic::Ordering::Relaxed) || backend.should_close()
+}
+
 fn main() -> Result<()> {
     let app = App::parse();
     if let Some(Command::Config { file, action }) = app.command {
@@ -252,6 +262,9 @@ fn main() -> Result<()> {
     let cfg = Config::load(&cli.config).context("loading config")?;
     let orientation = cli.orientation.unwrap_or(cfg.panel.orientation);
     let size = orientation.logical_size();
+
+    ctrlc::set_handler(|| STOP.store(true, std::sync::atomic::Ordering::Relaxed))
+        .context("installing the signal handler")?;
 
     let mut backend = make_backend(&cli, size, orientation)?;
     // Wake the backlight up front (no-op for the PNG / window backends).
@@ -275,6 +288,10 @@ fn main() -> Result<()> {
             let (boot, mut engine) = load_scene(&cli.scene, orientation, size)?;
             log::info!("boot '{}' ({:.1}s)", boot.scene.name, boot.scene.duration);
             play_to_end(&mut *backend, &mut engine, &boot, cli.fps)?;
+            if STOP.load(std::sync::atomic::Ordering::Relaxed) {
+                log::info!("stopping (signal)");
+                return Ok(());
+            }
 
             run_steady_state(&mut *backend, orientation, size, &cli, &cfg)?;
         }
@@ -307,7 +324,7 @@ fn play_to_end(
 
         let (frame, dirty) = engine.render(scene, &ctx, t);
         backend.present(&frame, &dirty)?;
-        if backend.should_close() || last {
+        if closing(backend) || last {
             return Ok(());
         }
         if let Some(rem) = budget.checked_sub(frame_start.elapsed()) {
@@ -554,7 +571,7 @@ fn run_steady_state(
             Showing::Dashboard => dash_engine.render(&dash_scene, &ctx, 0.0),
         };
         backend.present(&frame, &dirty)?;
-        if backend.should_close() {
+        if closing(backend) {
             return Ok(());
         }
         if let Some(rem) = budget.checked_sub(frame_start.elapsed()) {
@@ -632,7 +649,7 @@ fn play_single(
 
         let (frame, dirty) = engine.render(scene, &ctx_at(scene_t), scene_t);
         backend.present(&frame, &dirty)?;
-        if backend.should_close() || is_last {
+        if closing(backend) || is_last {
             break;
         }
         if !cli.capture {
@@ -646,7 +663,7 @@ fn play_single(
     if cli.hold && !cli.loop_scene {
         log::info!("holding final frame (Ctrl-C to exit)");
         let (frame, _) = engine.render(scene, &ctx_at(end_at), end_at);
-        while !backend.should_close() {
+        while !closing(backend) {
             backend.present(&frame, &[])?;
             std::thread::sleep(Duration::from_secs(2));
         }

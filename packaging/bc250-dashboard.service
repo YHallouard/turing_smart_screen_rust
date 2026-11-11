@@ -22,6 +22,9 @@ ExecStartPre=-/bin/sh -c 'mkdir -p %h/.config/bc250-dashboard; test -f %h/.confi
 ExecStartPre=/bin/sh -c 'for i in $(seq 30); do [ -e /dev/turzx-panel ] && exit 0; sleep 1; done; exit 0'
 ExecStart=%h/.local/bin/bc250-dashboard --backend serial --port /dev/turzx-panel --config %h/.config/bc250-dashboard/config.toml
 Restart=on-failure
+# Stop = SIGTERM, then the current frame is finished before exit (see main.rs);
+# do not wait the default 90 s if something hangs.
+TimeoutStopSec=10
 RestartSec=3
 # Stay out of the game's way: low CPU share under contention (still gets a
 # slice, so the panel keeps updating in-game), idle I/O, soft memory cap.
