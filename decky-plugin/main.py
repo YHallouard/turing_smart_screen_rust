@@ -105,6 +105,18 @@ def _installed_version() -> str:
         return ""
 
 
+def _same(got: str, want) -> bool:
+    """Daemon value vs requested value (numbers compared with a tolerance:
+    the daemon stores f32)."""
+    g, w = got.strip().lower(), str(want).strip().lower()
+    if g == w:
+        return True
+    try:
+        return abs(float(g) - float(w)) < 1e-3
+    except ValueError:
+        return False
+
+
 class Plugin:
     async def get_status(self) -> dict:
         """Service state, installed version and panel presence."""
@@ -207,7 +219,8 @@ class Plugin:
             return {"error": f"bad JSON from daemon: {e}", "settings": []}
 
     async def set_config(self, changes: dict) -> dict:
-        """Apply {key: value}; validated by the daemon, then one restart."""
+        """Apply {key: value}; validated by the daemon, read back, one restart."""
+        decky.logger.info(f"set_config {changes!r}")
         for key, val in changes.items():
             if isinstance(val, bool):
                 val = "true" if val else "false"
@@ -215,8 +228,16 @@ class Plugin:
                 _bin(), "config", "set", "--no-restart", key, str(val)
             )
             if code != 0:
+                decky.logger.error(f"config set {key}={val}: {out}")
                 return {"ok": False, "error": out}
+            # Read it back: a write that landed in another file must not pass.
+            code, got = await _run(_bin(), "config", "get", key)
+            if code != 0 or not _same(got, val):
+                msg = f"{key}: écrit '{val}' mais relu '{got.strip()}'"
+                decky.logger.error(msg)
+                return {"ok": False, "error": msg}
         code, out = await _run("systemctl", "--user", "restart", UNIT)
+        decky.logger.info(f"restart -> {code} {out}")
         return {"ok": code == 0, "error": "" if code == 0 else out}
 
     async def restart(self) -> dict:
