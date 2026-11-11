@@ -26,5 +26,6 @@ clap = { version = "4", features = ["derive"] }
 serde = { workspace = true }
 toml = { workspace = true }
 toml_edit = "0.22"
+ctrlc = { version = "3", features = ["termination"] }
 log = { workspace = true }
 env_logger = "0.11"
