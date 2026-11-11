@@ -52,6 +52,13 @@ const restart = callable<[], { ok: boolean; error: string }>("restart");
 const latestVersion = callable<[], { tag: string; error: string }>("latest_version");
 const update = callable<[], { ok: boolean; log: string; version: string }>("update");
 const logs = callable<[number], string>("logs");
+interface FpsDiag {
+  mangoapp: boolean;
+  config: string;
+  block: boolean;
+  csv_age: number | null;
+}
+const fpsDiag = callable<[], FpsDiag>("fps_diag");
 const repairUdev = callable<[], { ok: boolean; error: string }>("repair_udev");
 
 // Logs stay small: a few short lines, never a wall of text.
@@ -142,6 +149,7 @@ function Content() {
   const [busy, setBusy] = useState("");
   const [updLog, setUpdLog] = useState("");
   const [logText, setLogText] = useState<string | null>(null);
+  const [fps, setFps] = useState<FpsDiag | null>(null);
 
   const refresh = useCallback(async () => {
     setStatus(await getStatus());
@@ -291,6 +299,28 @@ function Content() {
         <Row>
           <ButtonItem layout="below" disabled={busy !== ""} onClick={doRestart}>
             {busy === "restart" ? "Redémarrage…" : "Redémarrer le dashboard"}
+          </ButtonItem>
+        </Row>
+      </PanelSection>
+
+      <PanelSection title="FPS">
+        <Row>
+          <div style={{ whiteSpace: "pre-line" }}>{fps === null
+            ? "Diagnostic non lancé"
+            : [
+                `Overlay Steam (mangoapp) : ${fps.mangoapp ? "actif" : "inactif"}`,
+                fps.mangoapp
+                  ? `Config : ${fps.block ? "enregistrement FPS activé" : "enregistrement FPS absent"}`
+                  : "Activez l'overlay de performances dans Steam",
+                `Dernier relevé : ${fps.csv_age === null ? "aucun" : `il y a ${fps.csv_age} s`}`,
+              ].join("\n")}</div>
+        </Row>
+        <Row>
+          <ButtonItem
+            layout="below"
+            onClick={async () => setFps(await fpsDiag())}
+          >
+            Diagnostiquer les FPS
           </ButtonItem>
         </Row>
       </PanelSection>

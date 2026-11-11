@@ -122,6 +122,43 @@ class Plugin:
             "can_repair": os.geteuid() == 0,
         }
 
+    async def fps_diag(self) -> dict:
+        """Why do (or don't) FPS show? mangoapp = Game Mode's overlay process."""
+        import time
+
+        out = {"mangoapp": False, "config": "", "block": False, "csv_age": None}
+        for d in glob.glob("/proc/[0-9]*"):
+            try:
+                with open(f"{d}/comm") as f:
+                    if f.read().strip() != "mangoapp":
+                        continue
+                with open(f"{d}/environ", "rb") as f:
+                    env = f.read().split(b"\0")
+            except OSError:
+                continue
+            out["mangoapp"] = True
+            for v in env:
+                if v.startswith(b"MANGOHUD_CONFIGFILE="):
+                    out["config"] = v.split(b"=", 1)[1].decode(errors="replace")
+            break
+        if out["config"]:
+            try:
+                with open(out["config"]) as f:
+                    out["block"] = "bc250-dashboard (managed)" in f.read()
+            except OSError:
+                pass
+        logs = os.path.join(
+            _user().pw_dir, ".local", "share", "bc250-dashboard", "fps-logs"
+        )
+        newest = max(
+            glob.glob(os.path.join(logs, "*.csv")),
+            key=os.path.getmtime,
+            default=None,
+        )
+        if newest:
+            out["csv_age"] = int(time.time() - os.path.getmtime(newest))
+        return out
+
     async def repair_udev(self) -> dict:
         """(Re)install the udev rule and re-apply it to the plugged panel.
 
