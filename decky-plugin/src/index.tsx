@@ -52,6 +52,13 @@ const restart = callable<[], { ok: boolean; error: string }>("restart");
 const latestVersion = callable<[], { tag: string; error: string }>("latest_version");
 const update = callable<[], { ok: boolean; log: string; version: string }>("update");
 const logs = callable<[number], string>("logs");
+interface FpsDiag {
+  mangoapp: boolean;
+  config: string;
+  block: boolean;
+  csv_age: number | null;
+}
+const fpsDiag = callable<[], FpsDiag>("fps_diag");
 const repairUdev = callable<[], { ok: boolean; error: string }>("repair_udev");
 
 // Logs stay small: a few short lines, never a wall of text.
@@ -79,6 +86,10 @@ function Field({
   value: Value;
   onChange: (v: Value) => void;
 }) {
+  const options = useMemo(
+    () => (s.choices ?? []).map((c) => ({ data: c, label: c })),
+    [s.choices],
+  );
   if (s.type === "bool") {
     return (
       <ToggleField
@@ -94,7 +105,7 @@ function Field({
       <DropdownItem
         label={s.label}
         description={s.help}
-        rgOptions={s.choices.map((c) => ({ data: c, label: c }))}
+        rgOptions={options}
         selectedOption={value as string}
         onChange={(o) => onChange(o.data)}
       />
@@ -125,26 +136,40 @@ function Field({
   );
 }
 
+// The quick-access menu unmounts the panel when it closes; keep unsaved edits.
+let savedDraft: Record<string, Value> = {};
+
 function Content() {
   const [status, setStatus] = useState<Status | null>(null);
   const [cfg, setCfg] = useState<ConfigDump | null>(null);
-  const [draft, setDraft] = useState<Record<string, Value>>({});
+  const [draft, setDraftState] = useState<Record<string, Value>>(savedDraft);
+  const setDraft = (f: (d: Record<string, Value>) => Record<string, Value>) =>
+    setDraftState((d) => (savedDraft = f(d)));
   const [latest, setLatest] = useState("");
   const [busy, setBusy] = useState("");
   const [updLog, setUpdLog] = useState("");
   const [logText, setLogText] = useState<string | null>(null);
+  const [fps, setFps] = useState<FpsDiag | null>(null);
 
   const refresh = useCallback(async () => {
     setStatus(await getStatus());
     setCfg(await getConfig());
-    setDraft({});
+    setDraft(() => ({}));
   }, []);
 
   useEffect(() => {
     refresh();
     latestVersion().then((r) => setLatest(r.tag));
     // Keep the state live (service starting, panel plugged in…).
-    const t = setInterval(() => getStatus().then(setStatus), 5000);
+    const t = setInterval(
+      () =>
+        getStatus().then((st) =>
+          setStatus((prev) =>
+            JSON.stringify(prev) === JSON.stringify(st) ? prev : st,
+          ),
+        ),
+      5000,
+    );
     return () => clearInterval(t);
   }, [refresh]);
 
@@ -228,6 +253,18 @@ function Content() {
 
   return (
     <>
+      {dirty && (
+        <PanelSection>
+          <Row>
+            <ButtonItem layout="below" disabled={busy !== ""} onClick={apply}>
+              {busy === "apply"
+                ? "Application…"
+                : `Appliquer (${Object.keys(draft).length}) et redémarrer`}
+            </ButtonItem>
+          </Row>
+        </PanelSection>
+      )}
+
       {noPanel && (
         <PanelSection title="⚠ Écran non détecté">
           <Row>
@@ -262,6 +299,28 @@ function Content() {
         <Row>
           <ButtonItem layout="below" disabled={busy !== ""} onClick={doRestart}>
             {busy === "restart" ? "Redémarrage…" : "Redémarrer le dashboard"}
+          </ButtonItem>
+        </Row>
+      </PanelSection>
+
+      <PanelSection title="FPS">
+        <Row>
+          <div style={{ whiteSpace: "pre-line" }}>{fps === null
+            ? "Diagnostic non lancé"
+            : [
+                `Overlay Steam (mangoapp) : ${fps.mangoapp ? "actif" : "inactif"}`,
+                fps.mangoapp
+                  ? `Config : ${fps.block ? "enregistrement FPS activé" : "enregistrement FPS absent"}`
+                  : "Activez l'overlay de performances dans Steam",
+                `Dernier relevé : ${fps.csv_age === null ? "aucun" : `il y a ${fps.csv_age} s`}`,
+              ].join("\n")}</div>
+        </Row>
+        <Row>
+          <ButtonItem
+            layout="below"
+            onClick={async () => setFps(await fpsDiag())}
+          >
+            Diagnostiquer les FPS
           </ButtonItem>
         </Row>
       </PanelSection>

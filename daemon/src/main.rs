@@ -348,6 +348,7 @@ fn run_steady_state(
         s.mangohud_log_dir.clone()
     };
 
+    let log_dir_for_mangoapp = if s.manage_mangohud { log_dir.clone() } else { None };
     let mut sensors = sensors::Sensors::detect(
         s.gpu,
         log_dir,
@@ -444,9 +445,19 @@ fn run_steady_state(
     let mut showing = Showing::Dashboard;
     let mut scene_start = Instant::now();
     let mut last_poll = Instant::now();
+    let mut last_mango = Instant::now() - Duration::from_secs(60);
+    let mango_dir = log_dir_for_mangoapp.clone();
 
     loop {
         let frame_start = Instant::now();
+
+        // Game Mode: keep FPS logging on in mangoapp's temporary config.
+        if let Some(dir) = &mango_dir {
+            if last_mango.elapsed() >= Duration::from_secs(10) {
+                last_mango = Instant::now();
+                mangohud::ensure_logging_mangoapp(dir);
+            }
+        }
 
         if last_poll.elapsed() >= poll {
             let now = Instant::now();
