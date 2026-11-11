@@ -13,6 +13,7 @@
 //! # mangohud_log_dir = "/home/you/.local/share/bc250-dashboard/fps-logs"
 //! fps_stale_secs       = 10.0   # ignore FPS logs older than this (no game)
 //! fps_bar_max          = 60.0   # FPS that fills the dashboard bar
+//! fps_avg_secs         = 5.0    # moving average window for the FPS (0 = latest sample)
 //! mangohud_prune_hours = 24.0   # delete MangoHud CSVs older than this (0 = keep)
 //! ```
 //!
@@ -90,6 +91,9 @@ pub struct Sensors {
     pub fps_stale_secs: f32,
     /// FPS value that fills the dashboard's FPS bar.
     pub fps_bar_max: f32,
+    /// FPS shown = average of the MangoHud samples from the last N seconds
+    /// (smooths the jumpy 2 s samples). `0` shows the latest sample as is.
+    pub fps_avg_secs: f32,
     /// Delete MangoHud CSVs in the log folder older than this many hours
     /// (keeping the newest). `0` disables pruning.
     pub mangohud_prune_hours: f32,
@@ -103,6 +107,7 @@ impl Default for Sensors {
             mangohud_log_dir: None,
             fps_stale_secs: 10.0,
             fps_bar_max: 60.0,
+            fps_avg_secs: 5.0,
             mangohud_prune_hours: 24.0,
         }
     }

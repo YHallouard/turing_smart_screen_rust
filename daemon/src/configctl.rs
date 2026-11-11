@@ -98,6 +98,10 @@ const SETTINGS: &[Setting] = &[
         ..s("sensors.fps_bar_max", Kind::Float, "Capteurs", "FPS barre pleine", "FPS qui remplit la barre.")
     },
     Setting {
+        range: Some((0.0, 30.0, 1.0)),
+        ..s("sensors.fps_avg_secs", Kind::Float, "Capteurs", "Moyenne FPS (s)", "Fenêtre de la moyenne glissante. 0 = dernière mesure.")
+    },
+    Setting {
         range: Some((0.0, 168.0, 1.0)),
         ..s("sensors.mangohud_prune_hours", Kind::Float, "Capteurs", "Purge des logs (h)", "0 = garder.")
     },
@@ -317,6 +321,7 @@ fn effective(cfg: &Config, key: &str) -> Option<String> {
             .unwrap_or_default(),
         "sensors.fps_stale_secs" => s.fps_stale_secs.to_string(),
         "sensors.fps_bar_max" => s.fps_bar_max.to_string(),
+        "sensors.fps_avg_secs" => s.fps_avg_secs.to_string(),
         "sensors.mangohud_prune_hours" => s.mangohud_prune_hours.to_string(),
         "alerts.enabled" => a.enabled.to_string(),
         "alerts.gpu_temp_c" => a.gpu_temp_c.to_string(),

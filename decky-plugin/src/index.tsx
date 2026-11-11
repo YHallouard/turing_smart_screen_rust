@@ -107,7 +107,13 @@ function Field({
         description={s.help}
         rgOptions={options}
         selectedOption={value as string}
-        onChange={(o) => onChange(o.data)}
+        onChange={(o: unknown) =>
+          onChange(
+            (o !== null && typeof o === "object" && "data" in o
+              ? (o as { data: Value }).data
+              : o) as Value,
+          )
+        }
       />
     );
   }
@@ -196,6 +202,21 @@ function Content() {
   }, [cfg]);
 
   const dirty = Object.keys(draft).length > 0;
+
+  // Toggles and drop-downs apply on the spot (no hidden pending state);
+  // sliders and text fields are batched behind the Apply button.
+  const applyNow = async (changes: Record<string, Value>) => {
+    setBusy("apply");
+    const r = await setConfig(changes);
+    toaster.toast({
+      title: "BC-250 Dashboard",
+      body: r.ok
+        ? `Appliqué : ${Object.entries(changes).map(([k, v]) => `${k} = ${v}`).join(", ")}`
+        : `Erreur : ${r.error}`,
+    });
+    await refresh();
+    setBusy("");
+  };
 
   const apply = async () => {
     setBusy("apply");
@@ -359,12 +380,14 @@ function Content() {
                 s={s}
                 value={s.key in draft ? draft[s.key] : s.value}
                 onChange={(v) =>
-                  setDraft((d) => {
-                    const n = { ...d };
-                    if (v === s.value) delete n[s.key];
-                    else n[s.key] = v;
-                    return n;
-                  })
+                  s.type === "bool" || s.choices?.length
+                    ? applyNow({ [s.key]: v })
+                    : setDraft((d) => {
+                        const n = { ...d };
+                        if (v === s.value) delete n[s.key];
+                        else n[s.key] = v;
+                        return n;
+                      })
                 }
               />
             </Row>

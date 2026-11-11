@@ -17,6 +17,7 @@ gpu = "auto"
 # mangohud_log_dir = "/home/yannhallouard/.local/share/MangoHud/logs"
 fps_stale_secs       = 10.0   # FPS log older than this = "no game" -> shows "-"
 fps_bar_max          = 60.0   # FPS that fills the dashboard bar
+fps_avg_secs         = 5.0    # FPS = average of the last N seconds of samples (0 = latest sample)
 mangohud_prune_hours = 24.0   # daemon deletes MangoHud CSVs older than this (0 = keep)
 
 [alerts]

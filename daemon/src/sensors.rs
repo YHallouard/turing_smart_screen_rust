@@ -63,6 +63,8 @@ pub struct Sensors {
     fan_seen_spinning: Vec<bool>,
     mangohud_dir: Option<PathBuf>,
     fps_stale: Duration,
+    /// Moving-average window for the FPS, seconds (`0` = latest sample).
+    fps_avg_secs: f32,
     /// Delete MangoHud CSVs older than this (keeping the newest). `None` = keep.
     fps_prune: Option<Duration>,
 }
@@ -78,6 +80,7 @@ impl Sensors {
         sel: config::GpuSel,
         mangohud_dir: Option<PathBuf>,
         fps_stale: Duration,
+        fps_avg_secs: f32,
         fps_prune: Option<Duration>,
     ) -> Self {
         let gpu = match sel {
@@ -124,6 +127,7 @@ impl Sensors {
             prev_cpu: None,
             mangohud_dir,
             fps_stale,
+            fps_avg_secs,
             fps_prune,
         }
     }
@@ -256,20 +260,56 @@ impl Sensors {
             return None; // stale log — no game running
         }
         let text = fs::read_to_string(&path).ok()?;
-        let mut after_header = false;
-        let mut last: Option<f64> = None;
-        for line in text.lines() {
-            let line = line.trim();
-            if line.starts_with("fps,") {
-                after_header = true;
-            } else if after_header {
-                if let Some(v) = line.split(',').next().and_then(|f| f.parse::<f64>().ok()) {
-                    last = Some(v);
-                }
-            }
-        }
-        last.map(|v| v.round().clamp(0.0, 9999.0) as u32)
+        fps_average(&text, self.fps_avg_secs).map(|v| v.round().clamp(0.0, 9999.0) as u32)
     }
+}
+
+/// FPS from a MangoHud CSV: the mean of the rows from the last `window_secs`
+/// seconds (by the `elapsed` column, ns since logging started; without that
+/// column, assume one row per 2 s). `window_secs <= 0` = the latest row only.
+fn fps_average(text: &str, window_secs: f32) -> Option<f64> {
+    let mut elapsed_col: Option<usize> = None;
+    let mut after_header = false;
+    // (fps, elapsed seconds if known)
+    let mut rows: Vec<(f64, Option<f64>)> = Vec::new();
+    for line in text.lines() {
+        let line = line.trim();
+        if line.starts_with("fps,") {
+            after_header = true;
+            elapsed_col = line.split(',').position(|c| c.trim() == "elapsed");
+        } else if after_header {
+            let mut cols = line.split(',');
+            let Some(fps) = cols.next().and_then(|f| f.trim().parse::<f64>().ok()) else {
+                continue;
+            };
+            let t = elapsed_col
+                .and_then(|i| line.split(',').nth(i))
+                .and_then(|v| v.trim().parse::<f64>().ok())
+                .map(|ns| ns / 1e9);
+            rows.push((fps, t));
+        }
+    }
+    let &(last_fps, last_t) = rows.last()?;
+    if window_secs <= 0.0 {
+        return Some(last_fps);
+    }
+    let window = f64::from(window_secs);
+    let picked: Vec<f64> = match last_t {
+        Some(end) => rows
+            .iter()
+            .rev()
+            .take_while(|(_, t)| t.is_none_or(|t| end - t <= window))
+            .map(|(f, _)| *f)
+            .collect(),
+        // No timestamps: MangoHud logs every 2 s (log_interval=2000).
+        None => rows
+            .iter()
+            .rev()
+            .take(((window / 2.0).ceil() as usize).max(1))
+            .map(|(f, _)| *f)
+            .collect(),
+    };
+    Some(picked.iter().sum::<f64>() / picked.len() as f64)
 }
 
 /// Locate the first AMD render node exposing `gpu_busy_percent`.
@@ -590,4 +630,29 @@ fn hwmon_by_name(name: &str) -> Option<PathBuf> {
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::fps_average;
+
+    const CSV: &str = "os,cpu,gpu\nlinux,x,y\nfps,frametime,elapsed\n\
+        60,16.6,0\n40,25,2000000000\n50,20,4000000000\n30,33,6000000000\n";
+
+    #[test]
+    fn average_uses_only_the_window() {
+        // last 4 s = rows at t=2,4,6 -> (40+50+30)/3
+        assert_eq!(fps_average(CSV, 4.0), Some(40.0));
+        // 0 = latest row
+        assert_eq!(fps_average(CSV, 0.0), Some(30.0));
+        // wide window = every row
+        assert_eq!(fps_average(CSV, 60.0), Some(45.0));
+    }
+
+    #[test]
+    fn average_without_elapsed_assumes_2s_rows() {
+        let csv = "fps,frametime\n10,1\n20,1\n30,1\n";
+        assert_eq!(fps_average(csv, 4.0), Some(25.0)); // last 2 rows
+        assert_eq!(fps_average("fps,x\n", 5.0), None);
+    }
 }

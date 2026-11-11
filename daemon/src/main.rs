@@ -353,6 +353,7 @@ fn run_steady_state(
         s.gpu,
         log_dir,
         Duration::from_secs_f32(s.fps_stale_secs.max(1.0)),
+        s.fps_avg_secs.max(0.0),
         (s.mangohud_prune_hours > 0.0)
             .then(|| Duration::from_secs_f32(s.mangohud_prune_hours * 3600.0)),
     );
