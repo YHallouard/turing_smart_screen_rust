@@ -83,7 +83,7 @@ All in `SerialTurzx::open_path`, except the frames:
    and rotate landscape frames in software.
 4. `SET_BRIGHTNESS` (daemon sends `255` right after opening the backend).
 5. First `present`: `DISPLAY_BITMAP` for the full frame; subsequent presents
-   send per-frame dirty rects (full frame again in landscape).
+   send the full frame again (dirty-region updates in portrait froze the panel, so they are no longer used).
 
 ## References
 

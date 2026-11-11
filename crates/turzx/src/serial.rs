@@ -31,8 +31,6 @@ pub struct SerialTurzx {
     /// Physical pixel array, always 320x480 on the wire.
     size: (u16, u16),
     orientation: Orientation,
-    /// Cleared until the first `present`, which always sends a full frame.
-    first_frame_done: bool,
 }
 
 impl SerialTurzx {
@@ -94,7 +92,6 @@ impl SerialTurzx {
             port,
             size: (PANEL_WIDTH, PANEL_HEIGHT),
             orientation: Orientation::Portrait,
-            first_frame_done: false,
         })
     }
 
@@ -121,17 +118,15 @@ impl DisplayBackend for SerialTurzx {
         let (w, h) = self.size;
         let full = [Rect::new(0, 0, w, h)];
 
-        // Landscape: rotate the 480x320 logical frame onto the physical array
-        // and resend in full (rotated dirty rects don't map back to logical
-        // space). Portrait: send dirty rects, except force a full repaint on
-        // the first frame or when nothing was flagged.
+        // Always send the whole frame. Landscape has to (rotated dirty rects
+        // don't map back to logical space) and has been solid in practice;
+        // portrait used to send per-region updates, which froze the panel until
+        // it was re-plugged. One code path = the one known to work.
         let (frame, regions): (Cow<Frame>, &[Rect]) = match self.orientation {
             Orientation::Landscape => (Cow::Owned(frame.rotated_cw()), &full),
-            Orientation::Portrait if self.first_frame_done && !dirty.is_empty() => {
-                (Cow::Borrowed(frame), dirty)
-            }
             Orientation::Portrait => (Cow::Borrowed(frame), &full),
         };
+        let _ = dirty;
 
         let rgb565 = frame.to_rgb565();
         for r in regions {
@@ -165,9 +160,6 @@ impl DisplayBackend for SerialTurzx {
         }
         self.port.flush()?;
 
-        // Only now is a full baseline guaranteed on the panel; a failure above
-        // returns early and leaves this clear so the next call resends in full.
-        self.first_frame_done = true;
         Ok(())
     }
 
